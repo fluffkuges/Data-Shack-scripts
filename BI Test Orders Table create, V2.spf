@@ -1,0 +1,1896 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ContentFilters</key>
+	<dict/>
+	<key>auto_connect</key>
+	<false/>
+	<key>data</key>
+	<dict>
+		<key>connection</key>
+		<dict>
+			<key>database</key>
+			<string>bi-test</string>
+			<key>host</key>
+			<string>datashack.production.thegrommet.com</string>
+			<key>kcid</key>
+			<string>5088416206084804739</string>
+			<key>name</key>
+			<string>datashack</string>
+			<key>rdbms_type</key>
+			<string>mysql</string>
+			<key>sslCACertFileLocation</key>
+			<string></string>
+			<key>sslCACertFileLocationEnabled</key>
+			<integer>0</integer>
+			<key>sslCertificateFileLocation</key>
+			<string></string>
+			<key>sslCertificateFileLocationEnabled</key>
+			<integer>0</integer>
+			<key>sslKeyFileLocation</key>
+			<string></string>
+			<key>sslKeyFileLocationEnabled</key>
+			<integer>0</integer>
+			<key>type</key>
+			<string>SPTCPIPConnection</string>
+			<key>useSSL</key>
+			<integer>0</integer>
+			<key>user</key>
+			<string>biroot</string>
+		</dict>
+		<key>session</key>
+		<dict>
+			<key>connectionEncoding</key>
+			<string>latin1</string>
+			<key>contentFilter</key>
+			<dict/>
+			<key>contentPageNumber</key>
+			<integer>1</integer>
+			<key>contentSelection</key>
+			<data>
+			YnBsaXN0MDDUAQIDBAUGNjdYJHZlcnNpb25YJG9iamVjdHNZJGFy
+			Y2hpdmVyVCR0b3ASAAGGoK0HCBUWFxgZHSQoLDA0VSRudWxs0wkK
+			CwwQFFdOUy5rZXlzWk5TLm9iamVjdHNWJGNsYXNzow0OD4ACgAOA
+			BKMREhOABYAGgAiADFR0eXBlVHJvd3NUa2V5c18QJlNlbGVjdGlv
+			bkRldGFpbFR5cGVQcmltYXJ5S2V5ZWREZXRhaWxz0wkKCxobHKCg
+			gAfSHh8gIVokY2xhc3NuYW1lWCRjbGFzc2VzXxATTlNNdXRhYmxl
+			RGljdGlvbmFyeaMgIiNcTlNEaWN0aW9uYXJ5WE5TT2JqZWN00goL
+			JSehJoAJgAvSCykqK1lOUy5zdHJpbmeAClhvcmRlcl9pZNIeHy0u
+			XxAPTlNNdXRhYmxlU3RyaW5noy0vI1hOU1N0cmluZ9IeHzEyXk5T
+			TXV0YWJsZUFycmF5ozEzI1dOU0FycmF50h4fIjWiIiNfEA9OU0tl
+			eWVkQXJjaGl2ZXLRODlUZGF0YYABAAgAEQAaACMALQAyADcARQBL
+			AFIAWgBlAGwAcAByAHQAdgB6AHwAfgCAAIIAhwCMAJEAugDBAMIA
+			wwDFAMoA1QDeAPQA+AEFAQ4BEwEVARcBGQEeASgBKgEzATgBSgFO
+			AVcBXAFrAW8BdwF8AX8BkQGUAZkAAAAAAAACAQAAAAAAAAA6AAAA
+			AAAAAAAAAAAAAAABmw==
+			</data>
+			<key>contentSortColIsAsc</key>
+			<true/>
+			<key>contentViewport</key>
+			<string>{{0, 0}, {1052, 619}}</string>
+			<key>isToolbarVisible</key>
+			<true/>
+			<key>queries</key>
+			<string>DROP TABLE IF EXISTS orders;
+CREATE TABLE orders (order_id INTEGER NOT NULL PRIMARY KEY, 
+magento_order_id VARCHAR(50) NOT NULL,
+order_date DATE,
+customer_email VARCHAR(128) NOT NULL,
+total_invoiced DECIMAL(12,4) NOT NULL,
+subtotal DECIMAL(12,4) NOT NULL,
+discount_amount DECIMAL(12,4) NOT NULL,
+gift_cards_amount DECIMAL(12,4) NOT NULL,
+total_invoiced_cost DECIMAL(12,4) NOT NULL,
+shipping_amount DECIMAL(12,4) NOT NULL,
+qty_ordered INTEGER NOT NULL,
+tax_amount DECIMAL(12.4) NOT NULL,
+ship_cost DECIMAL(12,4) NOT NULL,
+num_shipments INTEGER NOT NULL);
+
+
+CREATE INDEX orders_customer_email ON orders (customer_email);
+CREATE INDEX orders_order_date ON orders (order_date);
+
+
+REPLACE INTO orders 
+
+SELECT 
+     	o.entity_id AS order_id,
+     	o.increment_id AS magento_order_id, 
+      	DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') AS order_date,
+      	COALESCE(o.customer_email,'INVALID EMAIL') AS customer_email,
+      	COALESCE(o.base_total_invoiced, 0) AS total_invoiced,
+      	COALESCE(o.base_subtotal, 0) AS subtotal,
+		COALESCE(o.base_discount_amount, 0) as discount,
+		COALESCE(o.base_gift_cards_amount, 0) as giftcard,
+    	COALESCE(o.base_total_invoiced_cost, 0) as cogs,
+      	COALESCE(o.base_shipping_amount, 0) as shipping_rev, -- JN Note: charged to customer
+      	COALESCE(o.total_qty_ordered, 0) as qty_ordered, -- need to check
+      	COALESCE(o.base_tax_amount, 0) as tax_amount,
+        SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS shipping_cost, -- No really, we have total_cost = 99999999.9999 in there, also need to check to see if this table will duplicate - may need a sub query, JN Note: charged to the grommet (what the cost was to us)
+       	COUNT(s.order_id) as num_shipments
+FROM   		magento.sales_flat_order o 
+LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+WHERE o.status != 'canceled'
+	AND o.store_id = 1
+	AND (f.severity !=9 or f.severity is null) -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+          --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+GROUP BY o.entity_id
+ORDER BY	o.entity_id desc;
+
+</string>
+			<key>table</key>
+			<string>orders</string>
+			<key>view</key>
+			<string>SP_VIEW_CUSTOMQUERY</string>
+			<key>windowVerticalDividerPosition</key>
+			<real>275</real>
+		</dict>
+	</dict>
+	<key>encrypted</key>
+	<false/>
+	<key>format</key>
+	<string>connection</string>
+	<key>queryFavorites</key>
+	<array/>
+	<key>queryHistory</key>
+	<array>
+		<string>REPLACE INTO orders 
+
+SELECT 
+     	o.entity_id AS order_id,
+     	o.increment_id AS magento_order_id, 
+      	DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') AS order_date,
+      	COALESCE(o.customer_email,'INVALID EMAIL') AS customer_email,
+      	COALESCE(o.base_total_invoiced, 0) AS total_invoiced,
+      	COALESCE(o.base_subtotal, 0) AS subtotal,
+		COALESCE(o.base_discount_amount, 0) as discount,
+		COALESCE(o.base_gift_cards_amount, 0) as giftcard,
+    	COALESCE(o.base_total_invoiced_cost, 0) as cogs,
+      	COALESCE(o.base_shipping_amount, 0) as shipping_rev, -- JN Note: charged to customer
+      	COALESCE(o.total_qty_ordered, 0) as qty_ordered, -- need to check
+      	COALESCE(o.base_tax_amount, 0) as tax_amount,
+        SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS shipping_cost, -- No really, we have total_cost = 99999999.9999 in there, also need to check to see if this table will duplicate - may need a sub query, JN Note: charged to the grommet (what the cost was to us)
+       	COUNT(s.order_id) as num_shipments
+FROM   		magento.sales_flat_order o 
+LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+WHERE o.status != 'canceled'
+	AND o.store_id = 1
+	AND (f.severity !=9 or f.severity is null) -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+          --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+GROUP BY o.entity_id
+ORDER BY	o.entity_id desc</string>
+		<string>CREATE INDEX orders_order_date ON orders (order_date)</string>
+		<string>CREATE INDEX orders_customer_email ON orders (customer_email)</string>
+		<string>CREATE TABLE orders (order_id INTEGER NOT NULL PRIMARY KEY, 
+magento_order_id VARCHAR(50) NOT NULL,
+order_date DATE,
+customer_email VARCHAR(128) NOT NULL,
+total_invoiced DECIMAL(12,4) NOT NULL,
+subtotal DECIMAL(12,4) NOT NULL,
+discount_amount DECIMAL(12,4) NOT NULL,
+gift_cards_amount DECIMAL(12,4) NOT NULL,
+total_invoiced_cost DECIMAL(12,4) NOT NULL,
+shipping_amount DECIMAL(12,4) NOT NULL,
+qty_ordered INTEGER NOT NULL,
+tax_amount DECIMAL(12.4) NOT NULL,
+ship_cost DECIMAL(12,4) NOT NULL,
+num_shipments INTEGER NOT NULL)</string>
+		<string>DROP TABLE IF EXISTS orders</string>
+		<string>REPLACE INTO orders 
+
+SELECT 
+     	o.entity_id AS order_id,
+     	-- o.increment_id AS magento_order_id, 
+      	DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') AS order_date,
+      	COALESCE(o.customer_email,'INVALID EMAIL') AS customer_email,
+      	COALESCE(o.base_total_invoiced, 0) AS total_invoiced,
+      	COALESCE(o.base_subtotal, 0) AS subtotal,
+		COALESCE(o.base_discount_amount, 0) as discount,
+		COALESCE(o.base_gift_cards_amount, 0) as giftcard,
+    	COALESCE(o.base_total_invoiced_cost, 0) as cogs,
+      	COALESCE(o.base_shipping_amount, 0) as shipping_rev, -- JN Note: charged to customer
+      	COALESCE(o.total_qty_ordered, 0) as qty_ordered, -- need to check
+      	COALESCE(o.base_tax_amount, 0) as tax_amount,
+        SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS shipping_cost, -- No really, we have total_cost = 99999999.9999 in there, also need to check to see if this table will duplicate - may need a sub query, JN Note: charged to the grommet (what the cost was to us)
+       	COUNT(s.order_id) as num_shipments
+FROM   		magento.sales_flat_order o 
+LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+WHERE o.status != 'canceled'
+	AND o.store_id = 1
+	AND (f.severity !=9 or f.severity is null) -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+          --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+GROUP BY o.entity_id
+ORDER BY	o.entity_id desc</string>
+		<string>CREATE TABLE orders (order_id INTEGER NOT NULL PRIMARY KEY, 
+-- magento_order_id INTEGER NOT NULL,
+order_date DATE,
+customer_email VARCHAR(128) NOT NULL,
+total_invoiced DECIMAL(12,4) NOT NULL,
+subtotal DECIMAL(12,4) NOT NULL,
+discount_amount DECIMAL(12,4) NOT NULL,
+gift_cards_amount DECIMAL(12,4) NOT NULL,
+total_invoiced_cost DECIMAL(12,4) NOT NULL,
+shipping_amount DECIMAL(12,4) NOT NULL,
+qty_ordered INTEGER NOT NULL,
+tax_amount DECIMAL(12.4) NOT NULL,
+ship_cost DECIMAL(12,4) NOT NULL,
+num_shipments INTEGER NOT NULL)</string>
+		<string>REPLACE INTO orders 
+
+SELECT 
+     	o.entity_id AS order_id,
+     	o.increment_id AS magento_order_id,
+      	DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') AS order_date,
+      	COALESCE(o.customer_email,'INVALID EMAIL') AS customer_email,
+      	COALESCE(o.base_total_invoiced, 0) AS total_invoiced,
+      	COALESCE(o.base_subtotal, 0) AS subtotal,
+		COALESCE(o.base_discount_amount, 0) as discount,
+		COALESCE(o.base_gift_cards_amount, 0) as giftcard,
+    	COALESCE(o.base_total_invoiced_cost, 0) as cogs,
+      	COALESCE(o.base_shipping_amount, 0) as shipping_rev, -- JN Note: charged to customer
+      	COALESCE(o.total_qty_ordered, 0) as qty_ordered, -- need to check
+      	COALESCE(o.base_tax_amount, 0) as tax_amount,
+        SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS shipping_cost, -- No really, we have total_cost = 99999999.9999 in there, also need to check to see if this table will duplicate - may need a sub query, JN Note: charged to the grommet (what the cost was to us)
+       	COUNT(s.order_id) as num_shipments
+FROM   		magento.sales_flat_order o 
+LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+WHERE o.status != 'canceled'
+	AND o.store_id = 1
+	AND (f.severity !=9 or f.severity is null) -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+          --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+GROUP BY o.entity_id
+ORDER BY	o.entity_id desc</string>
+		<string>CREATE TABLE orders (order_id INTEGER NOT NULL PRIMARY KEY, 
+magento_order_id INTEGER NOT NULL,
+order_date DATE,
+customer_email VARCHAR(128) NOT NULL,
+total_invoiced DECIMAL(12,4) NOT NULL,
+subtotal DECIMAL(12,4) NOT NULL,
+discount_amount DECIMAL(12,4) NOT NULL,
+gift_cards_amount DECIMAL(12,4) NOT NULL,
+total_invoiced_cost DECIMAL(12,4) NOT NULL,
+shipping_amount DECIMAL(12,4) NOT NULL,
+qty_ordered INTEGER NOT NULL,
+tax_amount DECIMAL(12.4) NOT NULL,
+ship_cost DECIMAL(12,4) NOT NULL,
+num_shipments INTEGER NOT NULL)</string>
+		<string>Select count(*) from magento.sales_flat_order o where o.increment_id is null</string>
+		<string>Select min(o.increment_id) from magento.sales_flat_order o</string>
+		<string>Select max(o.increment_id) from magento.sales_flat_order o</string>
+		<string>REPLACE INTO orders 
+
+SELECT 
+     	o.entity_id AS order_id,
+     	o.increment_id AS mag_order_id,
+      	DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') AS order_date,
+      	COALESCE(o.customer_email,'INVALID EMAIL') AS customer_email,
+      	COALESCE(o.base_total_invoiced, 0) AS total_invoiced,
+      	COALESCE(o.base_subtotal, 0) AS subtotal,
+		COALESCE(o.base_discount_amount, 0) as discount,
+		COALESCE(o.base_gift_cards_amount, 0) as giftcard,
+    	COALESCE(o.base_total_invoiced_cost, 0) as cogs,
+      	COALESCE(o.base_shipping_amount, 0) as shipping_rev, -- JN Note: charged to customer
+      	COALESCE(o.total_qty_ordered, 0) as qty_ordered, -- need to check
+      	COALESCE(o.base_tax_amount, 0) as tax_amount,
+        SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS shipping_cost, -- No really, we have total_cost = 99999999.9999 in there, also need to check to see if this table will duplicate - may need a sub query, JN Note: charged to the grommet (what the cost was to us)
+       	COUNT(s.order_id) as num_shipments
+FROM   		magento.sales_flat_order o 
+LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+WHERE o.status != 'canceled'
+	AND o.store_id = 1
+	AND (f.severity !=9 or f.severity is null) -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+          --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+GROUP BY o.entity_id
+ORDER BY	o.entity_id desc</string>
+		<string>CREATE TABLE orders (order_id INTEGER NOT NULL PRIMARY KEY, 
+mag_order_id INTEGER NOT NULL,
+order_date DATE,
+customer_email VARCHAR(128) NOT NULL,
+total_invoiced DECIMAL(12,4) NOT NULL,
+subtotal DECIMAL(12,4) NOT NULL,
+discount_amount DECIMAL(12,4) NOT NULL,
+gift_cards_amount DECIMAL(12,4) NOT NULL,
+total_invoiced_cost DECIMAL(12,4) NOT NULL,
+shipping_amount DECIMAL(12,4) NOT NULL,
+qty_ordered INTEGER NOT NULL,
+tax_amount DECIMAL(12.4) NOT NULL,
+ship_cost DECIMAL(12,4) NOT NULL,
+num_shipments INTEGER NOT NULL)</string>
+		<string>SELECT 
+     	o.entity_id AS order_id,
+     	o.increment_id AS magento_order_id,
+      	DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') AS order_date,
+      	COALESCE(o.customer_email,'INVALID EMAIL') AS customer_email,
+      	COALESCE(o.base_total_invoiced, 0) AS total_invoiced,
+      	COALESCE(o.base_subtotal, 0) AS subtotal,
+		COALESCE(o.base_discount_amount, 0) as discount,
+		COALESCE(o.base_gift_cards_amount, 0) as giftcard,
+    	COALESCE(o.base_total_invoiced_cost, 0) as cogs,
+      	COALESCE(o.base_shipping_amount, 0) as shipping_rev, -- JN Note: charged to customer
+      	COALESCE(o.total_qty_ordered, 0) as qty_ordered, -- need to check
+      	COALESCE(o.base_tax_amount, 0) as tax_amount,
+        SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS shipping_cost, -- No really, we have total_cost = 99999999.9999 in there, also need to check to see if this table will duplicate - may need a sub query, JN Note: charged to the grommet (what the cost was to us)
+       	COUNT(s.order_id) as num_shipments
+FROM   		magento.sales_flat_order o 
+LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+WHERE o.status != 'canceled'
+	AND o.store_id = 1
+	AND (f.severity !=9 or f.severity is null) -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+          --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+GROUP BY o.entity_id
+ORDER BY	o.entity_id desc</string>
+		<string>CREATE TABLE orders (order_id INTEGER NOT NULL PRIMARY KEY, 
+magento_order_id INTEGER NOT NULL,
+order_date DATE,
+customer_email VARCHAR(128) NOT NULL,
+total_invoiced DECIMAL(12,4) NOT NULL,
+subtotal DECIMAL(12,4) NOT NULL,
+discount_amount DECIMAL(12,4) NOT NULL,
+gift_cards_amount DECIMAL(12,4) NOT NULL,
+total_invoiced_cost DECIMAL(12,4) NOT NULL,
+shipping_amount DECIMAL(12,4) NOT NULL,
+qty_ordered INTEGER NOT NULL,
+tax_amount DECIMAL(12.4) NOT NULL,
+ship_cost DECIMAL(12,4) NOT NULL)</string>
+		<string>#to test
+SELECT 
+     	o.entity_id AS order_id,
+     	o.increment_id AS magento_order_id,
+      	DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') AS order_date,
+      	COALESCE(o.customer_email,'INVALID EMAIL') AS customer_email,
+      	COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+      	COALESCE(o.base_subtotal, 0) AS base_subtotal,
+		COALESCE(o.base_discount_amount, 0) as base_discount,
+		COALESCE(o.base_gift_cards_amount, 0) as base_giftcard,
+    	COALESCE(o.base_total_invoiced_cost, 0) as cogs,
+      	COALESCE(o.base_shipping_amount, 0) as shipping_rev, -- JN Note: charged to customer
+      	COALESCE(o.total_qty_ordered, 0) as qty, -- need to check
+      	COALESCE(o.base_tax_amount, 0) as base_tax_amount,
+        SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS shipping_cost, -- No really, we have total_cost = 99999999.9999 in there, also need to check to see if this table will duplicate - may need a sub query, JN Note: charged to the grommet (what the cost was to us)
+       	COUNT(s.order_id) as num_shipments
+	FROM   magento.sales_flat_order o 
+	LEFT JOIN magento.sales_flat_shipment s ON s.order_id = o.entity_id
+	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+WHERE o.status != 'canceled'
+	AND o.store_id = 1
+	AND (f.severity !=9 or f.severity is null) -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+          --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+GROUP BY o.entity_id
+ORDER BY	o.entity_id desc</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(entity_id), count(distinct(customer_email))
+FROM	(SELECT   s.customer_email, entity_id,
+				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(s.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as purch_month_str
+		FROM     sales_flat_order s
+		LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+		WHERE	s.store_id = 1
+			AND	s.status != 'canceled'	
+			AND	(f.severity !=9	OR f.severity is null)
+GROUP BY s.entity_id, s.customer_email) n	
+WHERE n.purch_month_str = '2017-04-01'</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(entity_id), count(distinct(customer_email))
+FROM	(SELECT   s.customer_email, entity_id,
+				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(s.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as purch_month_str
+		FROM     sales_flat_order s
+		LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+		WHERE	s.store_id = 1
+			AND	s.status != 'canceled'	
+			AND	(f.severity !=9	OR f.severity is null)
+GROUP BY s.entity_id, s.customer_email) n	
+WHERE n.purch_month_str = '2017-04-01' 
+Group by customer_email</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(entity_id)
+FROM	(SELECT   s.customer_email, entity_id,
+				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(s.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as purch_month_str
+		FROM     sales_flat_order s
+		LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+		WHERE	s.store_id = 1
+			AND	s.status != 'canceled'	
+			AND	(f.severity !=9	OR f.severity is null)
+GROUP BY s.entity_id, s.customer_email) n	
+WHERE n.purch_month_str = '2017-04-01'</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(entity_id)
+FROM	(SELECT   s.customer_email, entity_id,
+				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(s.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as purch_month_str
+		FROM     sales_flat_order s
+		LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+		WHERE	s.store_id = 1
+			AND	s.status != 'canceled'	
+			AND	(f.severity !=9	OR is null)
+GROUP BY s.entity_id, s.customer_email) n	
+WHERE n.purch_month_str = '2017-04-01'</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(entity_id)
+FROM	(SELECT   s.customer_email, entity_id,
+STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(s.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as purch_month_str
+FROM     sales_flat_order s
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	(f.severity !=9	or is null)
+GROUP BY s.entity_id, s.customer_email) n	
+WHERE n.purch_month_str = '2017-04-01'</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(distinct(entity_id))
+FROM	(SELECT   s.customer_email, entity_id,
+STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(s.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as purch_month_str
+FROM     sales_flat_order s
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	(f.severity !=9	or is null)
+GROUP BY s.entity_id, s.customer_email) n	
+WHERE n.purch_month_str = '2017-04-01'</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(distinct(entity_id))
+FROM	(SELECT   s.customer_email, entity_id,
+STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(s.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as purch_month_str
+FROM     sales_flat_order s
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	(f.severity !=9	or is null)
+GROUP BY s.entity_id) n	
+WHERE n.purch_month_str = '2017-04-01'</string>
+		<string>lat_order s
+LEFT JOIN fraudd</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(distinct(entity_id))
+FROM	(SELECT   s.customer_email, entity_id,
+STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(s.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as purch_month_str
+FROM     sales_flat_order s
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	(f.severity !=9	or is null)
+GROUP BY s.customer_email) n	
+WHERE n.purch_month_str = '2017-04-01'</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(distinct(entity_id))
+FROM	(SELECT   s.customer_email, entity_id,
+STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(s.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as purch_month_str
+FROM     sales_flat_order s
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	f.severity !=9	
+GROUP BY s.customer_email) n	
+WHERE n.purch_month_str = '2017-04-01'</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(distinct(entity_id))
+FROM	(SELECT   s.customer_email, entity_id,
+STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(s.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as purch_month_str
+FROM     sales_flat_order s
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	f.severity !=9	
+GROUP BY s.customer_email) n	
+WHERE n.purch_month_str = '2017-04-01'</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+
+SELECT	count(distinct(s.entity_id))	
+FROM     sales_flat_order s
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	(f.severity !=9	OR f.severity is null)
+GROUP BY s.customer_email) n	
+WHERE n.first_purch_month_str = '2017-04-01'</string>
+		<string>-- AND	n.first_purch_month = 1; 
+
+#New Customer Query 
+SELECT	*	
+FROM	(SELECT   s.customer_email,
+STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(s.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purch_month_str,
+MIN(YEAR(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_year,	
+MIN(MONTH(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_month	
+FROM     sales_flat_order s
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	f.severity !=9	
+GROUP BY s.customer_email) n	
+WHERE n.first_purch_month_str = '2017-04-01'</string>
+		<string>SELECT	*	
+FROM	(SELECT   s.customer_email,
+STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(s.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purch_month_str,
+MIN(YEAR(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_year,	
+MIN(MONTH(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_month	
+FROM     sales_flat_order s
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	(f.severity !=9	or f.severity is null)
+GROUP BY s.customer_email) n	
+WHERE n.first_purch_month_str = '2017-04-01'</string>
+		<string>SELECT	*	
+FROM	(SELECT   s.customer_email,
+STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(s.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purch_month_str,
+MIN(YEAR(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_year,	
+MIN(MONTH(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_month	
+FROM     sales_flat_order s
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	(f.severity !=9	or f.severity is null)
+GROUP BY s.customer_email) n	
+WHERE n.first_purch_month_str = '2017-04-01'
+AND	n.first_purch_month = 1</string>
+		<string>SELECT     MONTH(DATE(CONVERT_TZ(IFNULL(pt.created_at,i.created_at),'UTC','America/New_York') + INTERVAL (IF(p.method='creditcard', 2, 0)) HOUR)) as 'Date',
+           FORMAT(SUM(IF(t.customer_type = 'Existing', (s.base_subtotal - s.base_gift_cards_amount), 0)), 2) AS 'Exist Sales',
+           FORMAT(COUNT(DISTINCT IF(t.customer_type = 'Existing', t.customer_email, NULL)),0) AS 'Exist Cust',
+           FORMAT(SUM(IF(t.customer_type = 'Existing', 1, 0)), 0) AS 'Exist Orders',
+           FORMAT(SUM(IF(t.customer_type = 'Existing', 1, 0))/COUNT(DISTINCT IF(t.customer_type = 'Existing', t.customer_email, NULL)),2) AS 'Orders/Exist Cust',
+           FORMAT(AVG(IF(t.customer_type = 'Existing', (s.base_subtotal - s.base_gift_cards_amount), NULL)), 2) AS 'Exist AOV',
+           FORMAT(SUM(IF(t.customer_type = 'New', (s.base_subtotal- s.base_gift_cards_amount), 0)), 2) AS 'New Sales',
+           FORMAT(COUNT(DISTINCT IF(t.customer_type = 'New', t.customer_email, 0)),0) AS 'New Cust',
+           FORMAT(SUM(IF(t.customer_type = 'New', 1, 0)), 0) AS 'New Orders',
+           FORMAT(SUM(IF(t.customer_type = 'New', 1, 0))/COUNT(DISTINCT IF(t.customer_type = 'New', t.customer_email, 0)),2) AS 'Orders/New Cust',
+           FORMAT(AVG(IF(t.customer_type = 'New', (s.base_subtotal - s.base_gift_cards_amount), NULL)), 2) AS 'New AOV',
+           FORMAT(SUM(s.base_subtotal - s.base_gift_cards_amount),2) AS 'Total Sales',
+           FORMAT(COUNT(DISTINCT t.customer_email),0) AS 'Total Customers',
+           FORMAT(COUNT(t.customer_email),0) AS 'Total Orders',
+           FORMAT(COUNT(t.customer_email)/COUNT(DISTINCT t.customer_email),2) AS 'Orders/Cust',
+           ROUND(AVG(s.base_subtotal - s.base_gift_cards_amount), 2) AS 'Total AOV'
+FROM       sales_flat_order s
+JOIN       (SELECT  customer_email,
+                    IF(MIN(CONVERT_TZ(created_at, 'UTC','America/New_York')) &lt; '2017-04-01','Existing','New') AS customer_type,
+                    COUNT(*) as number_of_orders
+           FROM     sales_flat_order_grid
+           WHERE    store_id = 1
+           GROUP BY customer_email) as t ON t.customer_email = s.customer_email
+JOIN  		 sales_flat_invoice i ON i.order_id = s.entity_id
+LEFT JOIN  sales_payment_transaction pt ON pt.order_id = s.entity_id AND pt.txn_type = 'capture' AND i.transaction_id = pt.txn_id
+LEFT JOIN  sales_flat_order_payment p ON pt.payment_id = p.entity_id
+WHERE      YEAR(DATE(CONVERT_TZ(IFNULL(pt.created_at,i.created_at),'UTC','America/New_York') + INTERVAL (IF(p.method='creditcard', 2, 0)) HOUR)) = 2017
+AND        MONTH(DATE(CONVERT_TZ(IFNULL(pt.created_at,i.created_at),'UTC','America/New_York') + INTERVAL (IF(p.method='creditcard', 2, 0)) HOUR)) = 4
+AND        i.state = 2
+AND        s.store_id = 1
+GROUP BY   MONTH(DATE(CONVERT_TZ(IFNULL(pt.created_at,i.created_at),'UTC','America/New_York') + INTERVAL (IF(p.method='creditcard', 2, 0)) HOUR))</string>
+		<string>SELECT    DATE(CONVERT_TZ(created_at,'UTC','America/New_York')) as 'date',
+          ROUND(SUM((base_subtotal + base_shipping_amount - abs(base_discount_amount - base_gift_cards_amount))) * 0.97,2) AS 'revenue',
+  COUNT(DISTINCT o.entity_id) AS 'orders',
+  YEAR(CONVERT_TZ(o.created_at,'UTC','America/New_York')) AS 'year',
+  MONTH(CONVERT_TZ(o.created_at,'UTC','America/New_York')) AS 'month'
+
+FROM      sales_flat_order o
+LEFT JOIN frauddetection_order_assessment f ON f.order_id = o.entity_id -- exclude fraud
+
+WHERE 1=1
+AND DATE(CONVERT_TZ(created_at,'UTC','America/New_York')) BETWEEN DATE_SUB(CURDATE(),INTERVAL 90 DAY) AND DATE_SUB(CURDATE(),INTERVAL 1 DAY)
+AND f.severity !=9
+AND o.store_id = 1
+
+GROUP BY 1 desc</string>
+		<string>#REPLACE INTO orders 
+SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS ship_cost -- No really, we have total_cost = 99999999.9999 in there
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null) -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS ship_cost, -- No really, we have total_cost = 99999999.9999 in there
+                  				f.severity
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			-- AND f.severity !=9. -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+          			-- AND f.severity is null #755,273
+          			And f.severity =!9
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS ship_cost, -- No really, we have total_cost = 99999999.9999 in there
+                  				f.severity
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			-- AND f.severity !=9. -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+          			-- AND f.severity is null #755,273
+          			And f.severity !9
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS ship_cost, -- No really, we have total_cost = 99999999.9999 in there
+                  				f.severity
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			-- AND f.severity !=9. -- with no null there are 1,927,273;  with (f.severity !=9 OR f.severity is null) there are 2,682,540
+          			AND f.severity is null
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>#REPLACE INTO orders 
+SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS ship_cost -- No really, we have total_cost = 99999999.9999 in there
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND f.severity !=9
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>#REPLACE INTO orders 
+SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS ship_cost -- No really, we have total_cost = 99999999.9999 in there
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND f.severity !=9 
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b</string>
+		<string>SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND f.severity !=9 
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b
+    WHERE customer_month_status = 'New Customer'</string>
+		<string>SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND f.severity !=9 
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b) c
+    WHERE customer_month_status = 'New Customer'</string>
+		<string>--
+      	
+      	#New Customer Query	
+SELECT	
+n.first_purch_month as first_purch_month,	
+n.first_purchase as first_purchase,
+COUNT(DISTINCT n.customer_email) as unique_customers	
+FROM	(SELECT   s.customer_email,	
+STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(s.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase,
+MIN(YEAR(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_year,	
+MIN(MONTH(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_month	
+FROM     magento.sales_flat_order s
+LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	f.severity !=9	
+GROUP BY s.customer_email) n	
+WHERE	n.first_purch_year = 2017	
+AND	n.first_purch_month = 4	
+and n.first_purchase = '2017-04-01'
+GROUP BY  first_purchase</string>
+		<string>--
+      	
+      	#New Customer Query	
+SELECT	
+n.first_purch_month as first_purch_month,	
+n.first_purchase as first_purchase,
+COUNT(DISTINCT n.customer_email) as unique_customers	
+FROM	(SELECT   s.customer_email,	
+STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(s.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase,
+MIN(YEAR(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_year,	
+MIN(MONTH(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_month	
+FROM     magento.sales_flat_order s
+LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	f.severity !=9	
+GROUP BY s.customer_email) n	
+WHERE	n.first_purchase = '2017-04-01'
+GROUP BY  first_purchase</string>
+		<string>--
+      	
+      	#New Customer Query	
+SELECT	
+n.first_purch_month as first_purch_month,	
+n.first_purchase as first_purchase,
+COUNT(DISTINCT n.customer_email) as unique_customers	
+FROM	(SELECT   s.customer_email,	
+STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(s.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase,
+MIN(YEAR(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_year,	
+MIN(MONTH(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_month	
+FROM     magento.sales_flat_order s
+LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	f.severity !=9	
+GROUP BY s.customer_email) n	
+WHERE	n.first_purch_year = 2017	
+AND	n.first_purch_month = 4	
+GROUP BY  first_purchase</string>
+		<string>--
+      	
+      	#New Customer Query	
+SELECT	n.first_purch_year as first_purch_year,	
+n.first_purch_month as first_purch_month,	
+n.first_purchase as first_purchase,
+COUNT(DISTINCT n.customer_email) as unique_customers	
+FROM	(SELECT   s.customer_email,	
+STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(s.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase,
+MIN(YEAR(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_year,	
+MIN(MONTH(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_month	
+FROM     magento.sales_flat_order s
+LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	f.severity !=9	
+GROUP BY s.customer_email) n	
+WHERE	n.first_purch_year = 2017	
+AND	n.first_purch_month = 4	
+GROUP BY first_purch_year, first_purch_month, first_purchase</string>
+		<string>--
+      	
+      	#New Customer Query	
+SELECT	n.first_purch_year as first_purch_year,	
+n.first_purch_month as first_purch_month,	
+n.first_purchase as first_purchase,
+COUNT(DISTINCT n.customer_email) as unique_customers	
+FROM	(SELECT   s.customer_email,	
+STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase,
+MIN(YEAR(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_year,	
+MIN(MONTH(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_month	
+FROM     magento.sales_flat_order s
+LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	f.severity !=9	
+GROUP BY s.customer_email) n	
+WHERE	n.first_purch_year = 2017	
+AND	n.first_purch_month = 4	
+GROUP BY first_purch_year, first_purch_month, first_purchase</string>
+		<string>--
+      	
+      	#New Customer Query	
+SELECT	n.first_purch_year as first_purch_year,	
+n.first_purch_month as first_purch_month,	
+COUNT(DISTINCT n.customer_email) as unique_customers	
+FROM	(SELECT   s.customer_email,	
+MIN(YEAR(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_year,	
+MIN(MONTH(convert_tz(s.created_at,'UTC','America/New_York'))) as first_purch_month	
+FROM     magento.sales_flat_order s
+LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = s.entity_id /* Fraud Filter */	
+WHERE	s.store_id = 1
+AND	s.status != 'canceled'	
+AND	f.severity !=9	
+GROUP BY s.customer_email) n	
+WHERE	n.first_purch_year = 2017	
+AND	n.first_purch_month = 4	
+GROUP BY first_purch_year, first_purch_month</string>
+		<string>SELECT 		count(distinct(o.customer_email)),
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			-- '2017-04-01' as as_of_month,
+       				-- STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') = '2017-04-01'
+
+      	GROUP BY first_purchase_month</string>
+		<string>SELECT 		count(COALESCE(o.customer_email,'INVALID EMAIL') as customer_email),
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			-- '2017-04-01' as as_of_month,
+       				-- STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') = '2017-04-01'
+
+      	GROUP BY first_purchase_month</string>
+		<string>SELECT 		count(COALESCE(o.customer_email,'INVALID EMAIL') as customer_email),
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			-- '2017-04-01' as as_of_month,
+       				-- STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND first_purchase_month = '2017-04-01'
+
+      	GROUP BY first_purchase_month</string>
+		<string>SELECT Count(c.customer_email)
+FROM
+
+
+
+(SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b) c
+    WHERE customer_month_status = 'New Customer'</string>
+		<string>SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b</string>
+		<string>WITH d AS (SELECT '2017-1-1' AS date)
+SELECT * FROM customer_month INNER JOIN d WHERE as_of_month = d.date</string>
+		<string>WITH d AS (SELECT '2017-1-1' AS date)
+SELECT * FROM customer_month WHERE as_of_month = d.date</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(IF(s.total_cost &gt; 100000, 0, s.total_cost), 0)) AS ship_cost -- No really, we have total_cost = 99999999.9999 in there
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT * from magento.sales_flat_shipment WHERE total_cost &gt; 100000</string>
+		<string>SELECT min(total_cost), max(total_cost) from magento.sales_flat_shipment</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+ --       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+--       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+--       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+--       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+--       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>o.base_subtotal, 0) AS base_subtotal /*,
+				 				COALESCE(o.base_discount_amou</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal /*,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost*/
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced /*,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost*/
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email /*,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost*/
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date /*,
+      	 					/*	COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost*/
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 					/*	COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost*/
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>DATE_FORMAT(CON</string>
+		<string>o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount,</string>
+		<string>COALESCE</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							IFNULL(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0) AS base_subtotal,
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0) AS base_total_invoiced,
+       							COALESCE(o.base_subtotal, 0),
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0),
+       							COALESCE(o.base_subtotal, 0),
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>CREATE TABLE orders (entity_id INTEGER NOT NULL PRIMARY KEY, 
+order_date DATE,
+customer_email VARCHAR(128) NOT NULL,
+base_total_invoiced DECIMAL(12,4) NOT NULL,
+base_subtotal DECIMAL(12,4) NOT NULL,
+base_discount_amount DECIMAL(12,4) NOT NULL,
+base_gift_cards_amount DECIMAL(12,4) NOT NULL,
+base_total_invoiced_cost DECIMAL(12,4) NOT NULL,
+base_shipping_amount DECIMAL(12,4) NOT NULL,
+total_qty_ordered INTEGER NOT NULL,
+ship_cost DECIMAL(12,4) NOT NULL)</string>
+		<string>COALESCE(o.base_total_invoiced, 0),</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_subtotal, 0),
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>o.base_subtotal, 0),
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COA</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							COALESCE(o.base_total_invoiced, 0),
+       							COALESCE(o.base_subtotal, 0), 
+				 				COALESCE(o.base_discount_amount, 0),
+				 				COALESCE(o.base_gift_cards_amount, 0),
+       							COALESCE(o.base_total_invoiced_cost, 0),
+       							COALESCE(o.base_shipping_amount, 0),
+       							COALESCE(o.total_qty_ordered, 0), 
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2015-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				ROUND(SUM(IFNULL(s.total_cost, 0)), 2) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				ROUND(SUM(IFNULL(s.total_cost, 0)), 2) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				SUM(IFNULL(s.total_cost, 0)) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				IFNULL(SUM(s.total_cost), 0.0) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				IFNULL(SUM(s.total_cost), 0) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				IFNULL(SUM(s.total_cost), 0) AS ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				IFNULL(SUM(s.total_cost),0) as ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				IFNULL(SUM(s.total_cost),0) as ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>explain SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				IFNULL(SUM(s.total_cost),0) as ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            --	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+		<string>REPLACE INTO orders SELECT 				
+       							o.entity_id,
+       							DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') as order_date,
+      	 						COALESCE(o.customer_email,'INVALID EMAIL') customer_email,
+       							o.base_total_invoiced,
+       							o.base_subtotal, 
+				 				o.base_discount_amount,  
+				 				o.base_gift_cards_amount,  
+       							o.base_total_invoiced_cost,  
+       							o.base_shipping_amount,  
+       							o.total_qty_ordered,  
+                  				IFNULL(SUM(s.total_cost),0) as ship_cost
+            	FROM   		magento.sales_flat_order o
+            	LEFT JOIN 	magento.sales_flat_shipment s ON s.order_id = o.entity_id
+           	 	LEFT JOIN 	magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        	
+        		WHERE status != 'canceled'
+           			AND o.store_id = 1
+          			AND (f.severity !=9 or f.severity is null)
+            	AND DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-%d') between '2017-01-01' AND '2017-01-31'
+            	GROUP BY 	o.entity_id
+           		ORDER BY	o.entity_id desc</string>
+	</array>
+	<key>rdbms_type</key>
+	<string>mysql</string>
+	<key>rdbms_version</key>
+	<string>5.5.5-10.2.11-MariaDB</string>
+	<key>version</key>
+	<integer>1</integer>
+</dict>
+</plist>
