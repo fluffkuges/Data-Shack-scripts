@@ -147,6 +147,87 @@ FROM
 		;
     
 
+
+#use this to update the customer_month table with monthly data, this creates a new table, could we just use one table?
+
+
+CREATE TABLE customer_month_active (as_of_month DATE NOT NULL,
+customer_email VARCHAR(128) NOT NULL,
+first_purchase_month DATE NOT NULL,
+last_purchase_month DATE NOT NULL,
+months_since_last_purchase INTEGER NOT NULL,
+cumulative_order_count INTEGER,
+customer_month_status VARCHAR(128),
+active_inactive VARCHAR(128),
+month_order_count INTEGER,
+month_revenue DECIMAL(12,4),
+month_product_revenue DECIMAL(12,4),
+month_product_cost DECIMAL(12,4),
+month_shipping_revenue DECIMAL(12,4),
+month_shipping_cost DECIMAL(12,4),
+unique Key customer_email (as_of_month, customer_email)
+
+);
+
+CREATE INDEX customer_month_customer_email ON customer_month_active (customer_email);
+CREATE INDEX customer_month_as_of_month ON customer_month_active  (as_of_month);
+
+
+
+REPLACE INTO customer_month_active(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, month_order_count, month_revenue, month_product_revenue, month_product_cost, month_shipping_revenue, month_shipping_cost) 
+
+
+SELECT 	cm.as_of_month,
+	   	cm.customer_email,
+	   	cm.first_purchase_month,
+	   	cm.last_purchase_month,	
+	   	cm.months_since_last_purchase,	
+		cm.cumulative_order_count,	
+		cm.customer_month_status,	
+		cm.active_inactive,
+	    orders as month_order_count,
+	    revenue as month_revenue,
+	    product_revenue as month_product_revenue,
+	    product_cost as month_product_cost,
+	    shipping_revenue as month_shipping_revenue,
+	    shipping_cost as month_shipping_cost  -- will need to check
+	    
+FROM customer_month cm
+LEFT JOIN 
+ 		(SELECT  
+  		 		s.order_date_month as purchase_month,
+  		  		s.customer_email,
+  		  		COUNT(s.order_id) orders,
+  		  		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount + s.ship_rev) as revenue,
+          		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount) as product_revenue,
+          		SUM(s.total_invoiced_cost) as product_cost,
+          		SUM(s.ship_rev) as shipping_revenue,
+          		SUM(s.ship_cost) as shipping_cost
+
+  		   
+  		FROM 	(SELECT 		
+       							order_id,
+       							STR_TO_DATE(DATE_FORMAT(order_date, '%Y-%m-01'), '%Y-%m-%d') as order_date_month,
+       							order_date,
+      	 						customer_email,
+       							total_invoiced,
+				 				subtotal,
+				 				discount_amount,
+				 				gift_cards_amount,
+       							total_invoiced_cost,
+       							shipping_amount as ship_rev,
+								qty_ordered as qty_ordered,
+								tax_amount,
+                  				ship_cost,
+                  				num_shipments
+            	FROM   		orders) s
+  
+  	-- WHERE s.order_date_month = '2015-10-01'
+    GROUP BY customer_email, purchase_month
+    ORDER BY customer_email, orders desc) b ON b.purchase_month = cm.as_of_month AND b.customer_email = cm.customer_email
+    
+    -- WHERE cm.as_of_month = '2015-10-01' 
+    ;
 </string>
 			<key>view</key>
 			<string>SP_VIEW_CUSTOMQUERY</string>
