@@ -1,0 +1,1295 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ContentFilters</key>
+	<dict/>
+	<key>auto_connect</key>
+	<true/>
+	<key>data</key>
+	<dict>
+		<key>connection</key>
+		<dict>
+			<key>host</key>
+			<string>datashack.production.thegrommet.com</string>
+			<key>kcid</key>
+			<string>5088416206084804739</string>
+			<key>name</key>
+			<string>datashack</string>
+			<key>rdbms_type</key>
+			<string>mysql</string>
+			<key>sslCACertFileLocation</key>
+			<string></string>
+			<key>sslCACertFileLocationEnabled</key>
+			<integer>0</integer>
+			<key>sslCertificateFileLocation</key>
+			<string></string>
+			<key>sslCertificateFileLocationEnabled</key>
+			<integer>0</integer>
+			<key>sslKeyFileLocation</key>
+			<string></string>
+			<key>sslKeyFileLocationEnabled</key>
+			<integer>0</integer>
+			<key>type</key>
+			<string>SPTCPIPConnection</string>
+			<key>useSSL</key>
+			<integer>0</integer>
+			<key>user</key>
+			<string>biroot</string>
+		</dict>
+		<key>session</key>
+		<dict>
+			<key>connectionEncoding</key>
+			<string>latin1</string>
+			<key>contentPageNumber</key>
+			<integer>1</integer>
+			<key>contentSelection</key>
+			<data>
+			YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFy
+			Y2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJX
+			TlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAF
+			gAdUdHlwZVRyb3dzXxAdU2VsZWN0aW9uRGV0YWlsVHlwZU5TSW5k
+			ZXhTZXTSFwsYGVxOU1JhbmdlQ291bnQQAIAG0hscHR5aJGNsYXNz
+			bmFtZVgkY2xhc3Nlc1pOU0luZGV4U2V0oh8gWk5TSW5kZXhTZXRY
+			TlNPYmplY3TSGxwiI1xOU0RpY3Rpb25hcnmiIiBfEA9OU0tleWVk
+			QXJjaGl2ZXLRJidUZGF0YYABAAgAEQAaACMALQAyADcAQABGAE0A
+			VQBgAGcAagBsAG4AcQBzAHUAdwB8AIEAoQCmALMAtQC3ALwAxwDQ
+			ANsA3gDpAPIA9wEEAQcBGQEcASEAAAAAAAACAQAAAAAAAAAoAAAA
+			AAAAAAAAAAAAAAABIw==
+			</data>
+			<key>contentSortColIsAsc</key>
+			<true/>
+			<key>contentViewport</key>
+			<string>{{0, 0}, {694, 450}}</string>
+			<key>isToolbarVisible</key>
+			<true/>
+			<key>queries</key>
+			<string>
+# these queries will create, and replace data in the customer month table
+
+SET @date = '2017-12-01';
+SET @prevmonth = '2017-11-01';
+
+-- Need help from engineering to figure out how to set an event with this code, will likely need to go back three months, each month, i don't know how to loop that
+
+
+# DROP TABLE IF EXISTS customer_month;
+
+CREATE TABLE customer_month (as_of_month DATE NOT NULL,
+customer_email VARCHAR(128) NOT NULL,
+first_purchase_month DATE NOT NULL,
+last_purchase_month DATE NOT NULL,
+months_since_last_purchase INTEGER NOT NULL,
+cumulative_order_count INTEGER,
+customer_month_status VARCHAR(128),
+active_inactive VARCHAR(128),
+month_order_count INTEGER,
+month_revenue DECIMAL(12,4),
+month_product_revenue DECIMAL(12,4),
+month_product_cost DECIMAL(12,4),
+month_shipping_revenue DECIMAL(12,4),
+month_shipping_cost DECIMAL(12,4),
+unique Key customer_email (as_of_month, customer_email),
+refreshed_at TIMESTAMP);
+
+);
+
+CREATE INDEX customer_month_customer_email ON customer_month (customer_email);
+CREATE INDEX customer_month_as_of_month ON customer_month  (as_of_month);
+
+#Run to replace/insert records
+
+
+REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+
+
+
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
+	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
+	 else 'active' end as customer_month_status,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			@date as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(MAX(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.order_id)) as cumulative_order_count
+       		FROM orders o
+        	WHERE STR_TO_DATE(DATE_FORMAT(o.order_date, '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= @date
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b
+    
+		;
+    
+
+#check 1
+select count(*), as_of_month
+FROM customer_month_2
+where as_of_month = @date;
+
+#check 2 to compare to first check
+select count(*), as_of_month
+FROM customer_month
+where as_of_month = @date;
+
+
+#Delete from customer_month where as_of_month = @date;  #only need this when there is a mess up
+/*
+
+
+
+
+#works, but not using orders table, these were drafts
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
+	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = '2017-10-01' AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
+	 else 'active' end as customer_month_stat,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			@date as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= @date
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b
+    
+		;
+    
+
+
+# this one works, but I want to switch to using orders '2017-04-01' month count should be 528,085
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b;
+    
+
+#test on how to do reactivated
+SELECT b.*,
+	   Case when c.customer_email is null then 'not in previous month' else 'customer in previous month' end as pre_month_test,
+-- COALESCE(c.customer_email,'not in previous month') as last_month,
+-- (EXISTS(SELECT * FROM customer_month c WHERE c.customer_email = b.customer_email)
+CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 when (b.months_since_last_purchase = 0 AND c.customer_email is null) THEN 'reactivated'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'		
+	 ELSE 'active' end as customer_month_status_test
+FROM customer_month b
+LEFT JOIN (SELECT customer_email 
+			FROM customer_month 
+			WHERE as_of_month = @prevmonth) c ON b.customer_email = c.customer_email
+WHERE b.as_of_month = @date
+and b.customer_email like 'jules%'
+-- ORDER BY customer_month_status
+;
+
+#another test for reactivated
+select b.*,
+	 CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
+	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = '2017-10-01' AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
+	 else 'active' end as customer_month_status_test,
+      EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = '2017-10-01' AND c.customer_email = b.customer_email) as test
+    /* case WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	--  when (b.months_since_last_purchase = 0 And c.customer_email is null) then 'reactivated'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'		
+	else 'other' end as customer_month_status_test 
+From customer_month b
+Where b.as_of_month = '2017-11-01'
+and b.customer_email like 'jules%'
+order by customer_month_status, test
+;
+*/
+</string>
+			<key>view</key>
+			<string>SP_VIEW_CUSTOMQUERY</string>
+			<key>windowVerticalDividerPosition</key>
+			<real>183</real>
+		</dict>
+	</dict>
+	<key>encrypted</key>
+	<false/>
+	<key>format</key>
+	<string>connection</string>
+	<key>queryFavorites</key>
+	<array>
+		<dict>
+			<key>name</key>
+			<string>draft bi-customer-months-set@date, revise reactivated</string>
+			<key>query</key>
+			<string>
+SET @date = '2017-04-01';
+
+
+# DROP TABLE IF EXISTS customer_month;
+
+CREATE TABLE customer_month (as_of_month DATE NOT NULL PRIMARY KEY,
+customer_email VARCHAR(128) NOT NULL PRIMARY KEY,
+first_purchase_month DATE NOT NULL,
+last_purchase_month DATE NOT NULL,
+months_since_last_purchase INTEGER NOT NULL,
+cumulative_order_count INTEGER,
+customer_month_status VARCHAR(128),
+active_inactive VARCHAR(128),
+month_revenue DECIMAL(12,4),
+month_product_revenue DECIMAL(12,4),
+month_product_cost DECIMAL(12,4),
+month_shipping_revenue DECIMAL(12,4),
+month_shipping_cost DECIMAL(12,4)
+
+);
+
+
+
+CREATE INDEX customer_month_customer_email ON customer_month (customer_email);
+CREATE INDEX customer_month_as_of_month ON customer_month  (as_of_month);
+
+
+
+
+#NEED TO FIX REACTIVATED AND NEED TO CHANGE TO ORDERS table (eventually) and put in the @date
+
+
+#REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+
+
+
+
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b;
+    
+
+
+# this one works, but I want to switch to using orders '2017-04-01' month countn should be 528,085
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b;
+
+</string>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>1-11-18 Consumer_Months draft</string>
+			<key>query</key>
+			<string>
+SET @date = '2017-04-01';
+
+
+# DROP TABLE IF EXISTS customer_month;
+
+CREATE TABLE customer_month (as_of_month DATE NOT NULL PRIMARY KEY,
+customer_email VARCHAR(128) NOT NULL PRIMARY KEY,
+first_purchase_month DATE NOT NULL,
+last_purchase_month DATE NOT NULL,
+months_since_last_purchase INTEGER NOT NULL,
+cumulative_order_count INTEGER,
+customer_month_status VARCHAR(128),
+active_inactive VARCHAR(128),
+month_revenue DECIMAL(12,4),
+month_product_revenue DECIMAL(12,4),
+month_product_cost DECIMAL(12,4),
+month_shipping_revenue DECIMAL(12,4),
+month_shipping_cost DECIMAL(12,4)
+
+);
+
+
+
+CREATE INDEX customer_month_customer_email ON customer_month (customer_email);
+CREATE INDEX customer_month_as_of_month ON customer_month  (as_of_month);
+
+
+
+
+#NEED TO FIX REACTIVATED AND NEED TO CHANGE TO ORDERS table (eventually) and put in the @date
+
+
+#REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+
+
+
+
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b;
+    
+
+
+# this one works, but I want to switch to using orders '2017-04-01' month countn should be 528,085
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b;
+    
+    ##NEED TO USE the exists function to do reactivated
+    Select
+	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+		
+CASE When (EXISTS(SELECT * FROM customer_month c WHERE c.customer_email = b.customer_email and b.as_of_month &lt; c.as_of_month), 'Reactivated', 'Active') then  as status
+
+FROM 
+(SELECT a.as_of_month, 
+		a.customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM a.as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM a.as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-09-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+       				
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-09-01'
+         
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-09-01'
+      
+      
+    ) a
+    
+    						
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b
+   
+   /*
+    WHERE  (CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (months_since_prior_purchase &gt; 12 AND b.months_since_last_purchase = 0) THEN 'Reactivated'
+				ELSE 'active' END) &lt;&gt; 'active'
+				*/
+select b.*,
+	  COALESCE(c.customer_email,'not in previous month') as last_month,
+-- (EXISTS(SELECT * FROM customer_month c WHERE c.customer_email = b.customer_email)
+case WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 when (b.months_since_last_purchase = 0 And c.customer_email is null) then 'reactivated'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'		
+	else 'active' end as customer_month_status_test
+From customer_month b
+left join (select customer_email 
+			from customer_month 
+			where as_of_month = '2017-10-01') c on b.customer_email = c.customer_email
+Where b.as_of_month = '2017-11-01'
+;
+
+</string>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>BI - Monthly Customers table create, replace</string>
+			<key>query</key>
+			<string>
+SET @date = '2010-10-01';
+SET @prevmonth = '2010-09-01';
+
+
+# DROP TABLE IF EXISTS customer_month;
+
+CREATE TABLE customer_month (as_of_month DATE NOT NULL,
+customer_email VARCHAR(128) NOT NULL,
+first_purchase_month DATE NOT NULL,
+last_purchase_month DATE NOT NULL,
+months_since_last_purchase INTEGER NOT NULL,
+cumulative_order_count INTEGER,
+customer_month_status VARCHAR(128),
+active_inactive VARCHAR(128),
+month_revenue DECIMAL(12,4),
+month_product_revenue DECIMAL(12,4),
+month_product_cost DECIMAL(12,4),
+month_shipping_revenue DECIMAL(12,4),
+month_shipping_cost DECIMAL(12,4)
+
+);
+
+
+
+CREATE INDEX customer_month_customer_email ON customer_month (customer_email);
+CREATE INDEX customer_month_as_of_month ON customer_month  (as_of_month);
+
+
+
+
+#NEED TO FIX REACTIVATED AND NEED TO CHANGE TO ORDERS table (eventually) and put in the @date
+
+
+REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+
+
+
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
+	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
+	 else 'active' end as customer_month_status,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.order_date,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			@date as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.order_date), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.order_id)) as cumulative_order_count
+       		FROM orders o
+        	WHERE STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.order_date,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= @date
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b
+    
+		;
+    
+
+
+#works, but not using orders table
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
+	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = '2017-10-01' AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
+	 else 'active' end as customer_month_stat,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			@date as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= @date
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b
+    
+		;
+    
+
+
+# this one works, but I want to switch to using orders '2017-04-01' month count should be 528,085
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b;
+    
+
+#test on how to do reactivated
+SELECT b.*,
+	   Case when c.customer_email is null then 'not in previous month' else 'customer in previous month' end as pre_month_test,
+-- COALESCE(c.customer_email,'not in previous month') as last_month,
+-- (EXISTS(SELECT * FROM customer_month c WHERE c.customer_email = b.customer_email)
+CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 when (b.months_since_last_purchase = 0 AND c.customer_email is null) THEN 'reactivated'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'		
+	 ELSE 'active' end as customer_month_status_test
+FROM customer_month b
+LEFT JOIN (SELECT customer_email 
+			FROM customer_month 
+			WHERE as_of_month = @prevmonth) c ON b.customer_email = c.customer_email
+WHERE b.as_of_month = @date
+and b.customer_email like 'jules%'
+-- ORDER BY customer_month_status
+;
+
+#another test for reactivated
+select b.*,
+	 CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
+	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = '2017-10-01' AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
+	 else 'active' end as customer_month_status_test,
+      EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = '2017-10-01' AND c.customer_email = b.customer_email) as test
+    /* case WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	--  when (b.months_since_last_purchase = 0 And c.customer_email is null) then 'reactivated'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'		
+	else 'other' end as customer_month_status_test */
+From customer_month b
+Where b.as_of_month = '2017-11-01'
+and b.customer_email like 'jules%'
+order by customer_month_status, test
+;
+</string>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>BI test - Costomer month table</string>
+			<key>query</key>
+			<string>
+SET @date = '2017-12-01';
+SET @prevmonth = '2017-11-01';
+
+/*
+# DROP TABLE IF EXISTS customer_month;
+
+CREATE TABLE customer_month (as_of_month DATE NOT NULL,
+customer_email VARCHAR(128) NOT NULL,
+first_purchase_month DATE NOT NULL,
+last_purchase_month DATE NOT NULL,
+months_since_last_purchase INTEGER NOT NULL,
+cumulative_order_count INTEGER,
+customer_month_status VARCHAR(128),
+active_inactive VARCHAR(128),
+month_revenue DECIMAL(12,4),
+month_product_revenue DECIMAL(12,4),
+month_product_cost DECIMAL(12,4),
+month_shipping_revenue DECIMAL(12,4),
+month_shipping_cost DECIMAL(12,4)
+
+);
+
+CREATE INDEX customer_month_customer_email ON customer_month (customer_email);
+CREATE INDEX customer_month_as_of_month ON customer_month  (as_of_month);
+*/
+#Run to replace/insert records
+
+
+REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+
+
+
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
+	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
+	 else 'active' end as customer_month_status,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			@date as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(MAX(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.order_id)) as cumulative_order_count
+       		FROM orders o
+        	WHERE STR_TO_DATE(DATE_FORMAT(o.order_date, '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= @date
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b
+    
+		;
+    
+
+
+select count(*), as_of_month
+FROM customer_month_2
+where as_of_month = @date;
+
+select count(*), as_of_month
+FROM customer_month
+where as_of_month = @date;
+
+
+Delete from customer_month where as_of_month = @date;
+/*
+
+
+
+
+#works, but not using orders table
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
+	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = '2017-10-01' AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
+	 else 'active' end as customer_month_stat,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			@date as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= @date
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b
+    
+		;
+    
+
+
+# this one works, but I want to switch to using orders '2017-04-01' month count should be 528,085
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'Churned'
+				WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+				WHEN (b.months_since_last_purchase = 0 AND months_since_first_purchase&gt;12) THEN 'Reactivated'
+				ELSE 'active' END as customer_month_status,
+				
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 		COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(CONVERT_TZ(o.created_at,'UTC','America/New_York')), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			'2017-04-01' as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(MAX(o.created_at), 'UTC', 'America/New_York'), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.entity_id)) as cumulative_order_count
+       		FROM magento.sales_flat_order o
+        	LEFT JOIN magento.frauddetection_order_assessment f ON f.order_id = o.entity_id
+        WHERE status != 'canceled'
+       	   AND o.store_id = 1
+           AND (f.severity !=9 or f.severity is null)
+           AND STR_TO_DATE(DATE_FORMAT(CONVERT_TZ(o.created_at,'UTC','America/New_York'), '%Y-%m-01'), '%Y-%m-%d') &lt;='2017-04-01'
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= '2017-04-01'
+      
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b;
+    
+
+#test on how to do reactivated
+SELECT b.*,
+	   Case when c.customer_email is null then 'not in previous month' else 'customer in previous month' end as pre_month_test,
+-- COALESCE(c.customer_email,'not in previous month') as last_month,
+-- (EXISTS(SELECT * FROM customer_month c WHERE c.customer_email = b.customer_email)
+CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 when (b.months_since_last_purchase = 0 AND c.customer_email is null) THEN 'reactivated'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'		
+	 ELSE 'active' end as customer_month_status_test
+FROM customer_month b
+LEFT JOIN (SELECT customer_email 
+			FROM customer_month 
+			WHERE as_of_month = @prevmonth) c ON b.customer_email = c.customer_email
+WHERE b.as_of_month = @date
+and b.customer_email like 'jules%'
+-- ORDER BY customer_month_status
+;
+
+#another test for reactivated
+select b.*,
+	 CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
+	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = '2017-10-01' AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
+	 else 'active' end as customer_month_status_test,
+      EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = '2017-10-01' AND c.customer_email = b.customer_email) as test
+    /* case WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	--  when (b.months_since_last_purchase = 0 And c.customer_email is null) then 'reactivated'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'		
+	else 'other' end as customer_month_status_test 
+From customer_month b
+Where b.as_of_month = '2017-11-01'
+and b.customer_email like 'jules%'
+order by customer_month_status, test
+;
+*/
+</string>
+		</dict>
+	</array>
+	<key>queryHistory</key>
+	<array>
+		<string>select count(*), as_of_month
+FROM customer_month_2
+where as_of_month = @date</string>
+		<string># DROP TABLE IF EXISTS customer_month;
+/*
+CREATE TABLE customer_month (as_of_month DATE NOT NULL,
+customer_email VARCHAR(128) NOT NULL,
+first_purchase_month DATE NOT NULL,
+last_purchase_month DATE NOT NULL,
+months_since_last_purchase INTEGER NOT NULL,
+cumulative_order_count INTEGER,
+customer_month_status VARCHAR(128),
+active_inactive VARCHAR(128),
+month_revenue DECIMAL(12,4),
+month_product_revenue DECIMAL(12,4),
+month_product_cost DECIMAL(12,4),
+month_shipping_revenue DECIMAL(12,4),
+month_shipping_cost DECIMAL(12,4),
+UNIQUE KEY `key_index` (`customer_email`,`as_of_month`)
+
+);
+
+CREATE INDEX customer_month_customer_email ON customer_month (customer_email);
+CREATE INDEX customer_month_as_of_month ON customer_month  (as_of_month);
+
+*/
+
+#Run to replace/insert records
+
+
+REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+
+
+
+SELECT 	b.as_of_month, 
+		b.customer_email, 
+		b.first_purchase_month, 
+		b.last_purchase_month,  
+		b.months_since_last_purchase, 
+		b.cumulative_order_count,
+	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
+	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
+	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
+	 else 'active' end as customer_month_status,
+	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
+			else 'active' END as active_inactive
+
+FROM 
+(SELECT as_of_month, 
+		customer_email, 
+		first_purchase_month, 
+		last_purchase_month, 
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
+		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
+		cumulative_order_count
+		
+		
+	FROM (
+    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
+    			 	STR_TO_DATE(DATE_FORMAT(MIN(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
+        			@date as as_of_month,
+       				STR_TO_DATE(DATE_FORMAT(MAX(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
+        			Count(distinct(o.order_id)) as cumulative_order_count
+       		FROM orders o
+        	WHERE STR_TO_DATE(DATE_FORMAT(o.order_date, '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+
+      	GROUP BY o.customer_email, as_of_month
+      	HAVING first_purchase_month &lt;= @date
+      
+    ) a
+    
+   HAVING months_since_last_purchase &lt;13
+    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b</string>
+		<string>SET @prevmonth = '2017-11-01'</string>
+		<string>SET @date = '2017-12-01'</string>
+		<string>select count(*), as_of_month
+FROM customer_month
+where as_of_month = @date</string>
+		<string>SET @prevmonth = '2017-10-01'</string>
+		<string>SET @date = '2017-11-01'</string>
+		<string>SET @prevmonth = '2017-09-01'</string>
+		<string>SET @date = '2017-10-01'</string>
+		<string>SET @prevmonth = '2017-08-01'</string>
+		<string>SET @date = '2017-09-01'</string>
+		<string>SET @prevmonth = '2017-07-01'</string>
+		<string>SET @date = '2017-08-01'</string>
+		<string>SET @prevmonth = '2017-06-01'</string>
+		<string>SET @date = '2017-07-01'</string>
+		<string>SET @prevmonth = '2017-05-01'</string>
+		<string>SET @date = '2017-06-01'</string>
+		<string>SET @prevmonth = '2017-04-01'</string>
+		<string>SET @date = '2017-05-01'</string>
+		<string>SET @prevmonth = '2017-03-01'</string>
+		<string>SET @date = '2017-04-01'</string>
+		<string>SET @prevmonth = '2017-02-01'</string>
+		<string>SET @date = '2017-03-01'</string>
+		<string>SET @prevmonth = '2017-01-01'</string>
+		<string>SET @date = '2017-02-01'</string>
+		<string>SET @prevmonth = '2016-12-01'</string>
+		<string>SET @date = '2017-01-01'</string>
+		<string>SET @prevmonth = '2016-11-01'</string>
+		<string>SET @date = '2016-12-01'</string>
+		<string>SET @prevmonth = '2016-10-01'</string>
+		<string>SET @date = '2016-11-01'</string>
+		<string>SET @prevmonth = '2016-09-01'</string>
+		<string>SET @date = '2016-10-01'</string>
+		<string>SET @prevmonth = '2016-08-01'</string>
+		<string>SET @date = '2016-09-01'</string>
+		<string>SET @prevmonth = '2016-07-01'</string>
+		<string>SET @date = '2016-08-01'</string>
+		<string>SET @prevmonth = '2016-06-01'</string>
+		<string>SET @date = '2016-07-01'</string>
+		<string>SET @prevmonth = '2016-05-01'</string>
+		<string>SET @date = '2016-06-01'</string>
+		<string>SET @prevmonth = '2016-04-01'</string>
+		<string>SET @date = '2016-05-01'</string>
+		<string>SET @prevmonth = '2016-03-01'</string>
+		<string>SET @date = '2016-04-01'</string>
+		<string>SET @prevmonth = '2016-02-01'</string>
+		<string>SET @date = '2016-03-01'</string>
+		<string>SET @prevmonth = '2016-01-01'</string>
+		<string>SET @date = '2016-02-01'</string>
+		<string>SET @prevmonth = '2015-12-01'</string>
+		<string>SET @date = '2016-01-01'</string>
+		<string>SET @prevmonth = '2016-01-011'</string>
+		<string>SET @prevmonth = '2015-11-01'</string>
+		<string>SET @date = '2015-12-01'</string>
+		<string>SET @prevmonth = '2015-10-01'</string>
+		<string>SET @date = '2015-11-01'</string>
+		<string>SET @prevmonth = '2015-09-01'</string>
+		<string>SET @date = '2015-10-01'</string>
+		<string>SET @prevmonth = '2015-08-01'</string>
+		<string>SET @date = '2015-09-01'</string>
+		<string>SET @prevmonth = '2015-07-01'</string>
+		<string>SET @date = '2015-08-01'</string>
+		<string>SET @prevmonth = '2015-06-01'</string>
+		<string>SET @date = '2015-07-01'</string>
+		<string>SET @prevmonth = '2015-05-01'</string>
+		<string>SET @date = '2015-06-01'</string>
+		<string>SET @prevmonth = '2015-04-01'</string>
+		<string>SET @date = '2015-05-01'</string>
+		<string>SET @prevmonth = '2015-03-01'</string>
+		<string>SET @date = '2015-04-01'</string>
+		<string>SET @date = '2015-03-01'</string>
+		<string>SET @prevmonth = '2015-02-01'</string>
+		<string>SET @prevmonth = '2015-01-01'</string>
+		<string>SET @date = '2015-02-01'</string>
+		<string>SET @prevmonth = '2014-12-01'</string>
+		<string>SET @date = '2015-01-01'</string>
+		<string>SET @prevmonth = '2014-11-01'</string>
+		<string>SET @date = '2014-12-01'</string>
+		<string>SET @prevmonth = '2014-10-01'</string>
+		<string>SET @date = '2014-11-01'</string>
+		<string>SET @prevmonth = '2014-09-01'</string>
+		<string>SET @date = '2014-10-01'</string>
+		<string>SET @prevmonth = '2014-08-01'</string>
+		<string>SET @date = '2014-09-01'</string>
+		<string>SET @prevmonth = '2014-07-01'</string>
+		<string>SET @date = '2014-08-01'</string>
+		<string>SET @prevmonth = '2014-06-01'</string>
+		<string>SET @date = '2014-07-01'</string>
+		<string>SET @prevmonth = '2014-05-01'</string>
+		<string>SET @date = '2014-06-01'</string>
+		<string>SET @prevmonth = '2014-04-01'</string>
+		<string>SET @date = '2014-05-01'</string>
+		<string>SET @prevmonth = '2014-03-01'</string>
+		<string>SET @date = '2014-04-01'</string>
+		<string>SET @prevmonth = '2014-02-01'</string>
+		<string>SET @date = '2014-03-01'</string>
+		<string>SET @prevmonth = '2014-01-01'</string>
+		<string>SET @date = '2014-02-01'</string>
+		<string>select max(as_of_month)
+from customer_month</string>
+		<string>SET @prevmonth = '2013-12-01'</string>
+	</array>
+	<key>rdbms_type</key>
+	<string>mysql</string>
+	<key>rdbms_version</key>
+	<string>5.5.5-10.2.11-MariaDB</string>
+	<key>version</key>
+	<integer>1</integer>
+</dict>
+</plist>
