@@ -62,17 +62,17 @@
 			<key>contentSortColIsAsc</key>
 			<true/>
 			<key>contentViewport</key>
-			<string>{{0, 0}, {694, 450}}</string>
+			<string>{{0, 0}, {987, 619}}</string>
 			<key>isToolbarVisible</key>
 			<true/>
 			<key>queries</key>
 			<string>
 # these queries will create, and replace data in the customer month table
 
-SET time_zone = 'America/New_York';
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-SET @date = '2017-01-01';
-SET @prevmonth = '2016-12-01';
+SET @date = '2010-10-01';
+SET @prevmonth = '2010-09-01';
 
 -- Need help from engineering to figure out how to set an event with this code, will likely need to go back three months, each month, i don't know how to loop that
 
@@ -104,7 +104,7 @@ CREATE INDEX customer_month_as_of_month ON customer_month  (as_of_month);
 #Run to replace/insert records
 
 
-REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, refreshed_at) 
 
 
 
@@ -119,7 +119,8 @@ SELECT 	b.as_of_month,
 	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email AND c.customer_month_status &lt;&gt;'Churned') = 0) THEN 'reactivated'
 	 else 'active' end as customer_month_status,
 	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
-			else 'active' END as active_inactive
+			else 'active' END as active_inactive,
+			NOW() as refreshed_at
 
 FROM 
 (SELECT as_of_month, 
@@ -174,6 +175,7 @@ month_subtotal DECIMAL(12,4),
 month_tax_amount DECIMAL(12,4),
 month_gift_card_amount DECIMAL(12,4),
 month_discount_amount DECIMAL(12,4),
+refreshed_at (TIMESTAMP)
 unique Key customer_email (as_of_month, customer_email)
 
 );
@@ -183,7 +185,7 @@ CREATE INDEX customer_month_as_of_month ON customer_month_active  (as_of_month);
 
 
 
-REPLACE INTO customer_month_active(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, month_order_count, month_revenue, month_product_revenue, month_product_cost, month_shipping_revenue, month_shipping_cost, month_total_invoiced, month_subtotal, month_tax_amount, month_gift_card_amount, month_discount_amount) 
+REPLACE INTO customer_month_active(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, month_order_count, month_revenue, month_product_revenue, month_product_cost, month_shipping_revenue, month_shipping_cost, month_total_invoiced, month_subtotal, month_tax_amount, month_gift_card_amount, month_discount_amount, refreshed_at) 
 
 SELECT 	cm.as_of_month,
 	   	cm.customer_email,
@@ -203,7 +205,8 @@ SELECT 	cm.as_of_month,
 	    subtotal as month_subtotal,
 	    tax_amount as month_tax_amount,
 	    gift_card_amount as month_gift_card_amount,
-	    discount_amount as month_discount_amount
+	    discount_amount as month_discount_amount,
+	    NOW() as refreshed_at
 	    
 FROM customer_month cm
 LEFT JOIN 
@@ -249,6 +252,8 @@ LEFT JOIN
     
     DROP TABLE IF EXISTS customer_month_active
 </string>
+			<key>table</key>
+			<string>customer_month_active</string>
 			<key>view</key>
 			<string>SP_VIEW_CUSTOMQUERY</string>
 			<key>windowVerticalDividerPosition</key>
@@ -1061,7 +1066,7 @@ order by customer_month_status, test
 	</array>
 	<key>queryHistory</key>
 	<array>
-		<string>REPLACE INTO customer_month_active(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, month_order_count, month_revenue, month_product_revenue, month_product_cost, month_shipping_revenue, month_shipping_cost, month_total_invoiced, month_subtotal, month_tax_amount, month_gift_card_amount, month_discount_amount) 
+		<string>REPLACE INTO customer_month_active(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, month_order_count, month_revenue, month_product_revenue, month_product_cost, month_shipping_revenue, month_shipping_cost, month_total_invoiced, month_subtotal, month_tax_amount, month_gift_card_amount, month_discount_amount, refreshed_at) 
 
 SELECT 	cm.as_of_month,
 	   	cm.customer_email,
@@ -1081,7 +1086,8 @@ SELECT 	cm.as_of_month,
 	    subtotal as month_subtotal,
 	    tax_amount as month_tax_amount,
 	    gift_card_amount as month_gift_card_amount,
-	    discount_amount as month_discount_amount
+	    discount_amount as month_discount_amount,
+	    NOW() as refreshed_at
 	    
 FROM customer_month cm
 LEFT JOIN 
@@ -1153,7 +1159,7 @@ CREATE INDEX customer_month_as_of_month ON customer_month  (as_of_month);
 #Run to replace/insert records
 
 
-REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, refreshed_at) 
 
 
 
@@ -1168,7 +1174,8 @@ SELECT 	b.as_of_month,
 	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email AND c.customer_month_status &lt;&gt;'Churned') = 0) THEN 'reactivated'
 	 else 'active' end as customer_month_status,
 	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
-			else 'active' END as active_inactive
+			else 'active' END as active_inactive,
+			NOW() as refreshed_at
 
 FROM 
 (SELECT as_of_month, 
@@ -1196,694 +1203,300 @@ FROM
    
    HAVING months_since_last_purchase &lt;13
     ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b</string>
-		<string>SET @prevmonth = '2016-12-01'</string>
+		<string>SET @prevmonth = '2010-09-01'</string>
 		<string># these queries will create, and replace data in the customer month table
 
-SET time_zone = 'America/New_York'</string>
-		<string>SET @date = '2017-01-01'</string>
-		<string>SET @prevmonth = '2017-01-01'</string>
-		<string>SET @date = '2017-02-01'</string>
-		<string>SET @prevmonth = '2017-02-01'</string>
-		<string>SET @date = '2017-03-01'</string>
-		<string>#Run to replace/insert records
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-
-REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
-
-
-
-SELECT 	b.as_of_month, 
-		b.customer_email, 
-		b.first_purchase_month, 
-		b.last_purchase_month,  
-		b.months_since_last_purchase, 
-		b.cumulative_order_count,
-	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
-	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
-	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email AND c.customer_month_status &lt;&gt;'Churned') = 0) THEN 'reactivated'
-	 else 'active' end as customer_month_status,
-	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
-			else 'active' END as active_inactive
-
-FROM 
-(SELECT as_of_month, 
-		customer_email, 
-		first_purchase_month, 
-		last_purchase_month, 
-		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
-		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
-		cumulative_order_count
-		
-		
-	FROM (
-    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
-    			 	STR_TO_DATE(DATE_FORMAT(MIN(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
-        			@date as as_of_month,
-       				STR_TO_DATE(DATE_FORMAT(MAX(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
-        			Count(distinct(o.order_id)) as cumulative_order_count
-       		FROM orders o
-        	WHERE STR_TO_DATE(DATE_FORMAT(o.order_date, '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
-
-      	GROUP BY o.customer_email, as_of_month
-      	HAVING first_purchase_month &lt;= @date
-      
-    ) a
-   
-   HAVING months_since_last_purchase &lt;13
-    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b</string>
-		<string>SET @prevmonth = '2017-03-01'</string>
-		<string>SET @date = '2017-04-01'</string>
-		<string>SET @prevmonth = '2017-04-01'</string>
-		<string>SET @date = '2017-05-01'</string>
-		<string>SET @prevmonth = '2017-05-01'</string>
-		<string>SET @date = '2017-06-01'</string>
-		<string>SET @prevmonth = '2017-06-01'</string>
-		<string>SET @date = '2017-07-01'</string>
-		<string>SET @prevmonth = '2017-07-01'</string>
-		<string>SET @date = '2017-08-01'</string>
-		<string>SET @prevmonth = '2017-08-01'</string>
-		<string>SET @date = '2017-09-01'</string>
-		<string>SET @prevmonth = '2017-09-01'</string>
-		<string>SET @date = '2017-10-01'</string>
-		<string>SET @prevmonth = '2017-10-01'</string>
-		<string>SET @date = '2017-11-01'</string>
-		<string>SET @prevmonth = '2017-11-01'</string>
+SET @date = '2010-10-01'</string>
+		<string>SET @prevmonth = '2010-10-01'</string>
 		<string># these queries will create, and replace data in the customer month table
 
-SET @date = '2017-12-01'</string>
-		<string>#Run to replace/insert records
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
+SET @date = '2010-11-01'</string>
+		<string>SET @prevmonth = '2010-11-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-#REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
+SET @date = '2010-12-01'</string>
+		<string>SET @prevmonth = '2010-12-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-SELECT 	b.as_of_month, 
-		b.customer_email, 
-		b.first_purchase_month, 
-		b.last_purchase_month,  
-		b.months_since_last_purchase, 
-		b.cumulative_order_count,
-	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
-	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
-	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email AND c.customer_month_status &lt;&gt;'Churned') = 0) THEN 'reactivated'
-	 else 'active' end as customer_month_status,
-	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
-			else 'active' END as active_inactive
+SET @date = '2011-01-01'</string>
+		<string>SET @prevmonth = '2011-01-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-FROM 
-(SELECT as_of_month, 
-		customer_email, 
-		first_purchase_month, 
-		last_purchase_month, 
-		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
-		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
-		cumulative_order_count
-		
-		
-	FROM (
-    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
-    			 	STR_TO_DATE(DATE_FORMAT(MIN(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
-        			@date as as_of_month,
-       				STR_TO_DATE(DATE_FORMAT(MAX(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
-        			Count(distinct(o.order_id)) as cumulative_order_count
-       		FROM orders o
-        	WHERE STR_TO_DATE(DATE_FORMAT(o.order_date, '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-      	GROUP BY o.customer_email, as_of_month
-      	HAVING first_purchase_month &lt;= @date
-      
-    ) a
-   WHERE customer_email = 'lutgring@comcast.net'
-   HAVING months_since_last_purchase &lt;13
-    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b</string>
-		<string>#Run to replace/insert records
+SET @date = '2011-02-01'</string>
+		<string>SET @prevmonth = '2011-02-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-#REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+SET @date = '2011-03-01'</string>
+		<string>SET @prevmonth = '2011-03-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
+SET @date = '2011-04-01'</string>
+		<string>SET @prevmonth = '2011-04-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-SELECT 	b.as_of_month, 
-		b.customer_email, 
-		b.first_purchase_month, 
-		b.last_purchase_month,  
-		b.months_since_last_purchase, 
-		b.cumulative_order_count,
-	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
-	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
-	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email AND c.customer_month_status &lt;&gt;'Churned') = 0) THEN 'reactivated'
-	 else 'active' end as customer_month_status,
-	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
-			else 'active' END as active_inactive
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-FROM 
-(SELECT as_of_month, 
-		customer_email, 
-		first_purchase_month, 
-		last_purchase_month, 
-		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
-		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
-		cumulative_order_count
-		
-		
-	FROM (
-    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
-    			 	STR_TO_DATE(DATE_FORMAT(MIN(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
-        			@date as as_of_month,
-       				STR_TO_DATE(DATE_FORMAT(MAX(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
-        			Count(distinct(o.order_id)) as cumulative_order_count
-       		FROM orders o
-        	WHERE STR_TO_DATE(DATE_FORMAT(o.order_date, '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+SET @date = '2011-05-01'</string>
+		<string>SET @prevmonth = '2011-05-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-      	GROUP BY o.customer_email, as_of_month
-      	HAVING first_purchase_month &lt;= @date
-      
-    ) a
-    
-   HAVING months_since_last_purchase &lt;13
-    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b</string>
-		<string>SELECT 	b.as_of_month, 
-		b.customer_email, 
-		b.first_purchase_month, 
-		b.last_purchase_month,  
-		b.months_since_last_purchase, 
-		b.cumulative_order_count,
-	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
-	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
-	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email AND c.customer_month_status !='Churned') = 0) THEN 'reactivated'
-	 else 'active' end as customer_month_status,
-	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
-			else 'active' END as active_inactive
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-FROM 
-(SELECT as_of_month, 
-		customer_email, 
-		first_purchase_month, 
-		last_purchase_month, 
-		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
-		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
-		cumulative_order_count
-		
-		
-	FROM (
-    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
-    			 	STR_TO_DATE(DATE_FORMAT(MIN(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
-        			@date as as_of_month,
-       				STR_TO_DATE(DATE_FORMAT(MAX(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
-        			Count(distinct(o.order_id)) as cumulative_order_count
-       		FROM orders o
-        	WHERE STR_TO_DATE(DATE_FORMAT(o.order_date, '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+SET @date = '2011-06-01'</string>
+		<string>SET @prevmonth = '2011-06-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-      	GROUP BY o.customer_email, as_of_month
-      	HAVING first_purchase_month &lt;= @date
-      
-    ) a
-    
-   HAVING months_since_last_purchase &lt;13
-    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b</string>
-		<string>REPLACE INTO customer_month_active(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, month_order_count, month_revenue, month_product_revenue, month_product_cost, month_shipping_revenue, month_shipping_cost, month_total_invoiced, month_subtotal, month_tax_amount, month_gift_card_amount, month_discount_amount) ) 
-explain
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-SELECT 	cm.as_of_month,
-	   	cm.customer_email,
-	   	cm.first_purchase_month,
-	   	cm.last_purchase_month,	
-	   	cm.months_since_last_purchase,	
-		cm.cumulative_order_count,	
-		cm.customer_month_status,	
-		cm.active_inactive,
-	    orders as month_order_count,
-	    revenue as month_revenue,
-	    product_revenue as month_product_revenue,
-	    product_cost as month_product_cost,
-	    shipping_revenue as month_shipping_revenue,
-	    shipping_cost as month_shipping_cost,  -- will need to check
-	    total_invoiced as month_total_invoiced,
-	    subtotal as month_subtotal,
-	    tax_amount as month_tax_amount,
-	    gift_card_amount as month_gift_card_amount,
-	    discount_amount as month_discount_amount
-	    
-FROM customer_month cm
-LEFT JOIN 
- 		(SELECT  
-  		 		s.order_date_month as purchase_month,
-  		  		s.customer_email,
-  		  		COUNT(s.order_id) orders,
-  		  		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount + s.ship_rev) as revenue,
-          		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount) as product_revenue,
-          		SUM(s.total_invoiced_cost) as product_cost,
-          		SUM(s.ship_rev) as shipping_revenue,
-          		SUM(s.ship_cost) as shipping_cost,
-          		SUM(s.total_invoiced) as total_invoiced,
-          		SUM(s.subtotal) as subtotal,
-          		sum(s.tax_amount) as tax_amount,
-          		SUM(s.gift_cards_amount) as gift_card_amount,
-          		SUM(s.discount_amount) as discount_amount
+SET @date = '2011-07-01'</string>
+		<string>SET @prevmonth = '2011-07-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-  		   
-  		FROM 	(SELECT 		
-       							order_id,
-       							STR_TO_DATE(DATE_FORMAT(order_date, '%Y-%m-01'), '%Y-%m-%d') as order_date_month,
-       							order_date,
-      	 						customer_email,
-       							total_invoiced,
-				 				subtotal,
-				 				discount_amount,
-				 				gift_cards_amount,
-       							total_invoiced_cost,
-       							shipping_amount as ship_rev,
-								qty_ordered as qty_ordered,
-								tax_amount,
-                  				ship_cost
-                  				-- num_shipments
-            	FROM   		orders) s
-  
-  	-- WHERE s.order_date_month = '2015-10-01'
-    GROUP BY customer_email, purchase_month
-    ) b ON b.purchase_month = cm.as_of_month AND b.customer_email = cm.customer_email
-    
-    -- WHERE cm.as_of_month = '2015-10-01'</string>
-		<string>#REPLACE INTO customer_month_active(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, month_order_count, month_revenue, month_product_revenue, month_product_cost, month_shipping_revenue, month_shipping_cost, month_total_invoiced, month_subtotal, month_tax_amount, month_gift_card_amount, month_discount_amount) ) 
-explain
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-SELECT 	cm.as_of_month,
-	   	cm.customer_email,
-	   	cm.first_purchase_month,
-	   	cm.last_purchase_month,	
-	   	cm.months_since_last_purchase,	
-		cm.cumulative_order_count,	
-		cm.customer_month_status,	
-		cm.active_inactive,
-	    orders as month_order_count,
-	    revenue as month_revenue,
-	    product_revenue as month_product_revenue,
-	    product_cost as month_product_cost,
-	    shipping_revenue as month_shipping_revenue,
-	    shipping_cost as month_shipping_cost,  -- will need to check
-	    total_invoiced as month_total_invoiced,
-	    subtotal as month_subtotal,
-	    tax_amount as month_tax_amount,
-	    gift_card_amount as month_gift_card_amount,
-	    discount_amount as month_discount_amount
-	    
-FROM customer_month cm
-LEFT JOIN 
- 		(SELECT  
-  		 		s.order_date_month as purchase_month,
-  		  		s.customer_email,
-  		  		COUNT(s.order_id) orders,
-  		  		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount + s.ship_rev) as revenue,
-          		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount) as product_revenue,
-          		SUM(s.total_invoiced_cost) as product_cost,
-          		SUM(s.ship_rev) as shipping_revenue,
-          		SUM(s.ship_cost) as shipping_cost,
-          		SUM(s.total_invoiced) as total_invoiced,
-          		SUM(s.subtotal) as subtotal,
-          		sum(s.tax_amount) as tax_amount,
-          		SUM(s.gift_cards_amount) as gift_card_amount,
-          		SUM(s.discount_amount) as discount_amount
+SET @date = '2011-08-01'</string>
+		<string>SET @prevmonth = '2011-08-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-  		   
-  		FROM 	(SELECT 		
-       							order_id,
-       							STR_TO_DATE(DATE_FORMAT(order_date, '%Y-%m-01'), '%Y-%m-%d') as order_date_month,
-       							order_date,
-      	 						customer_email,
-       							total_invoiced,
-				 				subtotal,
-				 				discount_amount,
-				 				gift_cards_amount,
-       							total_invoiced_cost,
-       							shipping_amount as ship_rev,
-								qty_ordered as qty_ordered,
-								tax_amount,
-                  				ship_cost,
-                  				num_shipments
-            	FROM   		orders) s
-  
-  	-- WHERE s.order_date_month = '2015-10-01'
-    GROUP BY customer_email, purchase_month
-    ) b ON b.purchase_month = cm.as_of_month AND b.customer_email = cm.customer_email
-    
-    -- WHERE cm.as_of_month = '2015-10-01'</string>
-		<string>#REPLACE INTO customer_month_active(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, month_order_count, month_revenue, month_product_revenue, month_product_cost, month_shipping_revenue, month_shipping_cost, month_total_invoiced, month_subtotal, month_tax_amount, month_gift_card_amount, month_discount_amount) ) 
-explain
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-SELECT 	cm.as_of_month,
-	   	cm.customer_email,
-	   	cm.first_purchase_month,
-	   	cm.last_purchase_month,	
-	   	cm.months_since_last_purchase,	
-		cm.cumulative_order_count,	
-		cm.customer_month_status,	
-		cm.active_inactive,
-	    orders as month_order_count,
-	    revenue as month_revenue,
-	    product_revenue as month_product_revenue,
-	    product_cost as month_product_cost,
-	    shipping_revenue as month_shipping_revenue,
-	    shipping_cost as month_shipping_cost,  -- will need to check
-	    total_invoiced as month_total_invoiced,
-	    subtotal as month_subtotal,
-	    tax_amount as month_tax_amount,
-	    gift_card_amount as month_gift_card_amount,
-	    discount_amount as month_discount_amount
-	    
-FROM customer_month cm
-LEFT JOIN 
- 		(SELECT  
-  		 		s.order_date_month as purchase_month,
-  		  		s.customer_email,
-  		  		COUNT(s.order_id) orders,
-  		  		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount + s.ship_rev) as revenue,
-          		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount) as product_revenue,
-          		SUM(s.total_invoiced_cost) as product_cost,
-          		SUM(s.ship_rev) as shipping_revenue,
-          		SUM(s.ship_cost) as shipping_cost,
-          		SUM(s.total_invoiced) as total_invoiced,
-          		SUM(s.subtotal) as subtotal,
-          		sum(s.tax_amount) as tax_amount,
-          		SUM(s.gift_cards_amount) as gift_card_amount,
-          		SUM(s.discount_amount) as discount_amount
+SET @date = '2011-09-01'</string>
+		<string>SET @prevmonth = '2011-09-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-  		   
-  		FROM 	(SELECT 		
-       							order_id,
-       							STR_TO_DATE(DATE_FORMAT(order_date, '%Y-%m-01'), '%Y-%m-%d') as order_date_month,
-       							order_date,
-      	 						customer_email,
-       							total_invoiced,
-				 				subtotal,
-				 				discount_amount,
-				 				gift_cards_amount,
-       							total_invoiced_cost,
-       							shipping_amount as ship_rev,
-								qty_ordered as qty_ordered,
-								tax_amount,
-                  				ship_cost,
-                  				num_shipments
-            	FROM   		orders) s
-  
-  	-- WHERE s.order_date_month = '2015-10-01'
-    GROUP BY customer_email, purchase_month
-    ORDER BY customer_email, orders desc) b ON b.purchase_month = cm.as_of_month AND b.customer_email = cm.customer_email
-    
-    -- WHERE cm.as_of_month = '2015-10-01'</string>
-		<string>#REPLACE INTO customer_month_active(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, month_order_count, month_revenue, month_product_revenue, month_product_cost, month_shipping_revenue, month_shipping_cost, month_total_invoiced, month_subtotal, month_tax_amount, month_gift_card_amount, month_discount_amount) ) 
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
+SET @date = '2011-10-01'</string>
+		<string>SET @prevmonth = '2011-10-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-SELECT 	cm.as_of_month,
-	   	cm.customer_email,
-	   	cm.first_purchase_month,
-	   	cm.last_purchase_month,	
-	   	cm.months_since_last_purchase,	
-		cm.cumulative_order_count,	
-		cm.customer_month_status,	
-		cm.active_inactive,
-	    orders as month_order_count,
-	    revenue as month_revenue,
-	    product_revenue as month_product_revenue,
-	    product_cost as month_product_cost,
-	    shipping_revenue as month_shipping_revenue,
-	    shipping_cost as month_shipping_cost,  -- will need to check
-	    total_invoiced as month_total_invoiced,
-	    subtotal as month_subtotal,
-	    tax_amount as month_tax_amount,
-	    gift_card_amount as month_gift_card_amount,
-	    discount_amount as month_discount_amount
-	    
-FROM customer_month cm
-LEFT JOIN 
- 		(SELECT  
-  		 		s.order_date_month as purchase_month,
-  		  		s.customer_email,
-  		  		COUNT(s.order_id) orders,
-  		  		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount + s.ship_rev) as revenue,
-          		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount) as product_revenue,
-          		SUM(s.total_invoiced_cost) as product_cost,
-          		SUM(s.ship_rev) as shipping_revenue,
-          		SUM(s.ship_cost) as shipping_cost,
-          		SUM(s.total_invoiced) as total_invoiced,
-          		SUM(s.subtotal) as subtotal,
-          		sum(s.tax_amount) as tax_amount,
-          		SUM(s.gift_cards_amount) as gift_card_amount,
-          		SUM(s.discount_amount) as discount_amount
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-  		   
-  		FROM 	(SELECT 		
-       							order_id,
-       							STR_TO_DATE(DATE_FORMAT(order_date, '%Y-%m-01'), '%Y-%m-%d') as order_date_month,
-       							order_date,
-      	 						customer_email,
-       							total_invoiced,
-				 				subtotal,
-				 				discount_amount,
-				 				gift_cards_amount,
-       							total_invoiced_cost,
-       							shipping_amount as ship_rev,
-								qty_ordered as qty_ordered,
-								tax_amount,
-                  				ship_cost,
-                  				num_shipments
-            	FROM   		orders) s
-  
-  	-- WHERE s.order_date_month = '2015-10-01'
-    GROUP BY customer_email, purchase_month
-    ORDER BY customer_email, orders desc) b ON b.purchase_month = cm.as_of_month AND b.customer_email = cm.customer_email
-    
-    -- WHERE cm.as_of_month = '2015-10-01'</string>
-		<string>CREATE INDEX customer_month_as_of_month ON customer_month_active  (as_of_month)</string>
-		<string>CREATE INDEX customer_month_customer_email ON customer_month_active (customer_email)</string>
-		<string>#use this to update the customer_month table with monthly data, this creates a new table, could we just use one table?
+SET @date = '2011-11-01'</string>
+		<string>SET @prevmonth = '2011-11-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-CREATE TABLE customer_month_active (as_of_month DATE NOT NULL,
-customer_email VARCHAR(128) NOT NULL,
-first_purchase_month DATE NOT NULL,
-last_purchase_month DATE NOT NULL,
-months_since_last_purchase INTEGER NOT NULL,
-cumulative_order_count INTEGER,
-customer_month_status VARCHAR(128),
-active_inactive VARCHAR(128),
-month_order_count INTEGER,
-month_revenue DECIMAL(12,4),
-month_product_revenue DECIMAL(12,4),
-month_product_cost DECIMAL(12,4),
-month_shipping_revenue DECIMAL(12,4),
-month_shipping_cost DECIMAL(12,4),
-month_total_invoiced DECIMAL(12,4),
-month_subtotal DECIMAL(12,4),
-month_tax_amount DECIMAL(12,4),
-month_gift_card_amount DECIMAL(12,4),
-month_discount_amount DECIMAL(12,4),
-unique Key customer_email (as_of_month, customer_email)
+SET @date = '2011-12-01'</string>
+		<string>SET @prevmonth = '2011-12-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-)</string>
-		<string>DROP TABLE IF EXISTS customer_month_active</string>
-		<string>#REPLACE INTO customer_month_active(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive, month_order_count, month_revenue, month_product_revenue, month_product_cost, month_shipping_revenue, month_shipping_cost, month_total_invoiced, month_subtotal, month_tax_amount, month_gift_card_amount, month_discount_amount) 
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
+SET @date = '2012-01-01'</string>
+		<string>SET @prevmonth = '2012-01-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-SELECT 	cm.as_of_month,
-	   	cm.customer_email,
-	   	cm.first_purchase_month,
-	   	cm.last_purchase_month,	
-	   	cm.months_since_last_purchase,	
-		cm.cumulative_order_count,	
-		cm.customer_month_status,	
-		cm.active_inactive,
-	    orders as month_order_count,
-	    revenue as month_revenue,
-	    product_revenue as month_product_revenue,
-	    product_cost as month_product_cost,
-	    shipping_revenue as month_shipping_revenue,
-	    shipping_cost as month_shipping_cost,  -- will need to check
-	    total_invoiced as month_total_invoiced,
-	    subtotal as month_subtotal,
-	    tax_amount as month_tax_amount,
-	    gift_card_amount as month_gift_card_amount,
-	    discount_amount as month_discount_amount
-	    
-	    
-FROM customer_month cm
-LEFT JOIN 
- 		(SELECT  
-  		 		s.order_date_month as purchase_month,
-  		  		s.customer_email,
-  		  		COUNT(s.order_id) orders,
-  		  		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount + s.ship_rev) as revenue,
-          		SUM(s.subtotal - abs(s.discount_amount) - s.gift_cards_amount) as product_revenue,
-          		SUM(s.total_invoiced_cost) as product_cost,
-          		SUM(s.ship_rev) as shipping_revenue,
-          		SUM(s.ship_cost) as shipping_cost,
-          		SUM(s.total_invoiced) as total_invoiced,
-          		SUM(s.subtotal) as subtotal,
-          		sum(s.tax_amount) as tax_amount,
-          		SUM(s.gift_cards_amount) as gift_card_amount,
-          		SUM(s.discount_amount) as discount_amount
-          		
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-  		   
-  		FROM 	(SELECT 		
-       							order_id,
-       							STR_TO_DATE(DATE_FORMAT(order_date, '%Y-%m-01'), '%Y-%m-%d') as order_date_month,
-       							order_date,
-      	 						customer_email,
-       							total_invoiced,
-				 				subtotal,
-				 				discount_amount,
-				 				gift_cards_amount,
-       							total_invoiced_cost,
-       							shipping_amount as ship_rev,
-								qty_ordered as qty_ordered,
-								tax_amount,
-                  				ship_cost,
-                  				num_shipments
-            	FROM   		orders) s
-  
-  	-- WHERE s.order_date_month = '2015-10-01'
-    GROUP BY customer_email, purchase_month
-    ORDER BY customer_email, orders desc) b ON b.purchase_month = cm.as_of_month AND b.customer_email = cm.customer_email
-    
-    -- WHERE cm.as_of_month = '2015-10-01'</string>
-		<string>ALTER TABLE customer_month_active
-ADD COLUMN month_discount_amount DECIMAL(12,4) AFTER month_gift_cards_amount</string>
-		<string>ALTER TABLE customer_month_active
-ADD COLUMN month_gift_cards_amount DECIMAL(12,4) AFTER month_total_invoiced</string>
-		<string>ALTER TABLE customer_month_active
-ADD COLUMN month_tax_amount DECIMAL(12,4) AFTER month_total_invoiced</string>
-		<string>ALTER TABLE customer_month_active
-ADD COLUMN month_subtotal DECIMAL(12,4) AFTER month_total_invoiced</string>
-		<string>select count(*), as_of_month
-FROM customer_month_2
-where as_of_month = @date</string>
-		<string># DROP TABLE IF EXISTS customer_month;
-/*
-CREATE TABLE customer_month (as_of_month DATE NOT NULL,
-customer_email VARCHAR(128) NOT NULL,
-first_purchase_month DATE NOT NULL,
-last_purchase_month DATE NOT NULL,
-months_since_last_purchase INTEGER NOT NULL,
-cumulative_order_count INTEGER,
-customer_month_status VARCHAR(128),
-active_inactive VARCHAR(128),
-month_revenue DECIMAL(12,4),
-month_product_revenue DECIMAL(12,4),
-month_product_cost DECIMAL(12,4),
-month_shipping_revenue DECIMAL(12,4),
-month_shipping_cost DECIMAL(12,4),
-UNIQUE KEY `key_index` (`customer_email`,`as_of_month`)
+SET @date = '2012-02-01'</string>
+		<string>SET @prevmonth = '2012-02-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-);
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-CREATE INDEX customer_month_customer_email ON customer_month (customer_email);
-CREATE INDEX customer_month_as_of_month ON customer_month  (as_of_month);
+SET @date = '2012-03-01'</string>
+		<string>SET @prevmonth = '2012-03-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-*/
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-#Run to replace/insert records
+SET @date = '2012-04-01'</string>
+		<string>SET @prevmonth = '2012-04-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-REPLACE INTO customer_month(as_of_month, customer_email, first_purchase_month, last_purchase_month, months_since_last_purchase, cumulative_order_count, customer_month_status, active_inactive) 
+SET @date = '2012-05-01'</string>
+		<string>SET @prevmonth = '2012-05-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
+SET @date = '2012-06-01'</string>
+		<string>SET @prevmonth = '2012-06-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-SELECT 	b.as_of_month, 
-		b.customer_email, 
-		b.first_purchase_month, 
-		b.last_purchase_month,  
-		b.months_since_last_purchase, 
-		b.cumulative_order_count,
-	CASE WHEN b.as_of_month = b.first_purchase_month THEN 'New Customer'
-	 WHEN b.months_since_last_purchase = 12 THEN 'Churned'	
-	 WHEN b.months_since_last_purchase = 0 AND (EXISTS(SELECT * FROM customer_month c WHERE c.as_of_month = @prevmonth AND c.customer_email = b.customer_email) = 0) THEN 'reactivated'
-	 else 'active' end as customer_month_status,
-	CASE 	WHEN b.months_since_last_purchase = 12 THEN 'inactive'
-			else 'active' END as active_inactive
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
 
-FROM 
-(SELECT as_of_month, 
-		customer_email, 
-		first_purchase_month, 
-		last_purchase_month, 
-		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM last_purchase_month)) AS months_since_last_purchase,
-		PERIOD_DIFF( EXTRACT(YEAR_MONTH FROM as_of_month), EXTRACT(YEAR_MONTH FROM first_purchase_month)) AS months_since_first_purchase, 
-		cumulative_order_count
-		
-		
-	FROM (
-    		SELECT 	COALESCE(o.customer_email,'INVALID EMAIL') as customer_email,
-    			 	STR_TO_DATE(DATE_FORMAT(MIN(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as first_purchase_month,
-        			@date as as_of_month,
-       				STR_TO_DATE(DATE_FORMAT(MAX(o.order_date), '%Y-%m-01'), '%Y-%m-%d') as last_purchase_month,
-        			Count(distinct(o.order_id)) as cumulative_order_count
-       		FROM orders o
-        	WHERE STR_TO_DATE(DATE_FORMAT(o.order_date, '%Y-%m-01'), '%Y-%m-%d') &lt;=@date
+SET @date = '2012-07-01'</string>
+		<string>SET @prevmonth = '2012-07-01'</string>
+		<string># these queries will create, and replace data in the customer month table
 
-      	GROUP BY o.customer_email, as_of_month
-      	HAVING first_purchase_month &lt;= @date
-      
-    ) a
-    
-   HAVING months_since_last_purchase &lt;13
-    ORDER BY months_since_last_purchase, customer_email, cumulative_order_count desc) b</string>
-		<string>SET @date = '2017-12-01'</string>
-		<string>select count(*), as_of_month
-FROM customer_month
-where as_of_month = @date</string>
-		<string>SET @prevmonth = '2016-11-01'</string>
-		<string>SET @date = '2016-12-01'</string>
-		<string>SET @prevmonth = '2016-10-01'</string>
-		<string>SET @date = '2016-11-01'</string>
-		<string>SET @prevmonth = '2016-09-01'</string>
-		<string>SET @date = '2016-10-01'</string>
-		<string>SET @prevmonth = '2016-08-01'</string>
-		<string>SET @date = '2016-09-01'</string>
-		<string>SET @prevmonth = '2016-07-01'</string>
-		<string>SET @date = '2016-08-01'</string>
-		<string>SET @prevmonth = '2016-06-01'</string>
-		<string>SET @date = '2016-07-01'</string>
-		<string>SET @prevmonth = '2016-05-01'</string>
-		<string>SET @date = '2016-06-01'</string>
-		<string>SET @prevmonth = '2016-04-01'</string>
-		<string>SET @date = '2016-05-01'</string>
-		<string>SET @prevmonth = '2016-03-01'</string>
-		<string>SET @date = '2016-04-01'</string>
-		<string>SET @prevmonth = '2016-02-01'</string>
-		<string>SET @date = '2016-03-01'</string>
-		<string>SET @prevmonth = '2016-01-01'</string>
-		<string>SET @date = '2016-02-01'</string>
-		<string>SET @prevmonth = '2015-12-01'</string>
-		<string>SET @date = '2016-01-01'</string>
-		<string>SET @prevmonth = '2016-01-011'</string>
-		<string>SET @prevmonth = '2015-11-01'</string>
-		<string>SET @date = '2015-12-01'</string>
-		<string>SET @prevmonth = '2015-10-01'</string>
-		<string>SET @date = '2015-11-01'</string>
-		<string>SET @prevmonth = '2015-09-01'</string>
-		<string>SET @date = '2015-10-01'</string>
-		<string>SET @prevmonth = '2015-08-01'</string>
-		<string>SET @date = '2015-09-01'</string>
-		<string>SET @prevmonth = '2015-07-01'</string>
-		<string>SET @date = '2015-08-01'</string>
-		<string>SET @prevmonth = '2015-06-01'</string>
-		<string>SET @date = '2015-07-01'</string>
-		<string>SET @prevmonth = '2015-05-01'</string>
-		<string>SET @date = '2015-06-01'</string>
-		<string>SET @prevmonth = '2015-04-01'</string>
-		<string>SET @date = '2015-05-01'</string>
-		<string>SET @prevmonth = '2015-03-01'</string>
-		<string>SET @date = '2015-04-01'</string>
-		<string>SET @date = '2015-03-01'</string>
-		<string>SET @prevmonth = '2015-02-01'</string>
-		<string>SET @prevmonth = '2015-01-01'</string>
-		<string>SET @date = '2015-02-01'</string>
-		<string>SET @prevmonth = '2014-12-01'</string>
-		<string>SET @date = '2015-01-01'</string>
-		<string>SET @prevmonth = '2014-11-01'</string>
-		<string>SET @date = '2014-12-01'</string>
-		<string>SET @prevmonth = '2014-10-01'</string>
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2012-08-01'</string>
+		<string>SET @prevmonth = '2012-08-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2012-09-01'</string>
+		<string>SET @prevmonth = '2012-09-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2012-10-01'</string>
+		<string>SET @prevmonth = '2012-10-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2012-11-01'</string>
+		<string>SET @prevmonth = '2012-11-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2012-12-01'</string>
+		<string>SET @prevmonth = '2012-12-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-01-01'</string>
+		<string>SET @prevmonth = '2013-01-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-02-01'</string>
+		<string>SET @prevmonth = '2013-02-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-03-01'</string>
+		<string>SET @prevmonth = '2013-03-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-04-01'</string>
+		<string>SET @prevmonth = '2013-04-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-05-01'</string>
+		<string>SET @prevmonth = '2013-05-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-06-01'</string>
+		<string>SET @prevmonth = '2013-06-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-07-01'</string>
+		<string>SET @prevmonth = '2013-07-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-08-01'</string>
+		<string>SET @prevmonth = '2013-08-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-09-01'</string>
+		<string>SET @prevmonth = '2013-09-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-10-01'</string>
+		<string>SET @prevmonth = '2013-10-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-11-01'</string>
+		<string>SET @prevmonth = '2013-11-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2013-12-01'</string>
+		<string>SET @prevmonth = '2013-12-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2014-01-01'</string>
+		<string>SET @prevmonth = '2014-01-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2014-02-01'</string>
+		<string>SET @prevmonth = '2014-02-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2014-03-01'</string>
+		<string>SET @prevmonth = '2014-03-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2014-04-01'</string>
+		<string>SET @prevmonth = '2014-04-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2014-05-01'</string>
+		<string>SET @prevmonth = '2014-05-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2014-06-01'</string>
+		<string>SET @prevmonth = '2014-06-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2014-07-01'</string>
+		<string>SET @prevmonth = '2014-07-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2014-08-01'</string>
+		<string>SET @prevmonth = '2014-08-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2014-09-01'</string>
+		<string>SET @prevmonth = '2014-09-01'</string>
+		<string># these queries will create, and replace data in the customer month table
+
+# SET time_zone = 'America/New_York'; do not need this anymore because datashack
+
+SET @date = '2014-10-01'</string>
 	</array>
 	<key>rdbms_type</key>
 	<string>mysql</string>
